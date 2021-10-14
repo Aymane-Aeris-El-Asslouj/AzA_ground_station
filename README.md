@@ -8,6 +8,6 @@ Server communications - Not handled
 Decision making - Not handled  
 Pathfinding - Only 2d straight line pathfinding  
 
-{r, results ="asis", echo = FALSE}
-fig_files <- dir(pattern = "jpg$") 
-cat(paste0("* ", fig_files, " ![](", fig_files, ")\n"))
+fig_files <- list.files(pattern = "jpg$") # change to png$ as needed!
+writeLines(paste0(fig_files, "\n",
+                  "![`", fig_files, "`](", fig_files, ")\n\n"), "README.md")
