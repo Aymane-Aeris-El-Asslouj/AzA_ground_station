@@ -7,3 +7,5 @@ Status:
 Server communications - Not handled
 Decision making - Not handled
 Pathfinding - Only 2d straight line pathfinding
+
+
