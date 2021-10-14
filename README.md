@@ -7,3 +7,7 @@ Status:
 Server communications - Not handled  
 Decision making - Not handled  
 Pathfinding - Only 2d straight line pathfinding  
+
+{r, results ="asis", echo = FALSE}
+fig_files <- dir(pattern = "jpg$") 
+cat(paste0("* ", fig_files, " ![](", fig_files, ")\n"))
