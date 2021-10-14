@@ -8,5 +8,5 @@ Server communications - Not handled
 Decision making - Not handled  
 Pathfinding - Only 2d straight line pathfinding  
 
-![AzA_Avionics_diagram.jpg](AzA_Avionics_diagram.jpg)
-![Path_finder_diagram.jpg](Path_finder_diagram.jpg)
+![Diagrams/AzA_Avionics_diagram.jpg](Diagrams/AzA_Avionics_diagram.jpg)
+![Diagrams/Path_finder_diagram.jpg](Diagrams/Path_finder_diagram.jpg)
