@@ -10,8 +10,20 @@ NODE_MIN_DISTANCE = Parameters.NODE_MIN_DISTANCE
 OBSTACLE_ORBIT_RATIO = Parameters.OBSTACLE_ORBIT_RATIO
 
 
+# Parent class for Map objects (waypoints, border vertices, obstacles)
+class Map_object:
+    # return 2d coordinates
+    def Point_2d(self):
+        return self.x, self.y
+
+
+# Parent class for Map structures (border, path)
+class Map_structure:
+    pass
+
+
 # obstacle object with x,y position and radius r
-class Obstacle:
+class Obstacle(Map_object):
     def __init__(self, Coordinates_2d_tuple, r):
         self.r = r
         self.x = Coordinates_2d_tuple[0]
@@ -82,30 +94,18 @@ class Obstacle:
 
             return Node_1, Node_2
 
-    # return 2d coordinates
-    def Point_2d(self):
-        return self.x, self.y
-
 
 # Border vertex object with x,y position
-class Border_vertex:
+class Border_vertex(Map_object):
     def __init__(self, Coordinates_2d_tuple):
         self.x = Coordinates_2d_tuple[0]
         self.y = Coordinates_2d_tuple[1]
 
-    # return 2d coordinates
-    def Point_2d(self):
-        return self.x, self.y
-
 
 # Border object made with multiple vertex objects
-class Border:
+class Border(Map_structure):
     def __init__(self, Border_vertex_list):
         self.Border_vertex_list = Border_vertex_list
-
-    # returns a path made from the Border vertices
-    def Get_Path(self):
-        return Path(list(Waypoint(Vertex.Point_2d()) for Vertex in self.Border_vertex_list))
 
     # Returns list of edges of the border
     def Compute_simple_edges(self):
@@ -157,7 +157,7 @@ class Border:
 # parent Obstacle: node created on an obstacle during straight path generation
 # parent Border vertex:  node created on a border vertex during straight path generation
 # Alleviation waypoint: waypoint added during path curving to make the turn on the waypoint easier
-class Waypoint:
+class Waypoint(Map_object):
     def __init__(self, Coordinates_2d_tuple, z=None, Parent_obstacle=None, Parent_border_vertex=None):
         self.x = Coordinates_2d_tuple[0]
         self.y = Coordinates_2d_tuple[1]
@@ -203,10 +203,6 @@ class Waypoint:
 
         return not Collision
 
-    # return 2d coordinates
-    def Point_2d(self):
-        return self.x, self.y
-
     # Check if waypoint coincides with another waypoint
     def Coincides_with(self, Waypoint_1):
         return Geometrical_functions.Float_eq_2d(self.Point_2d(), Waypoint_1.Point_2d())
@@ -236,16 +232,13 @@ class Waypoint:
 
 
 # path made from multiple waypoints
-class Path:
+class Path(Map_structure):
+
+    Simple_distance_2d = None
+    Full_distance_3d = None
+
     def __init__(self, Waypoint_list):
         self.Waypoint_list = Waypoint_list
-        self.Simple_distance_2d = None
-        self.Full_distance_3d = None
-        self.Distance_2d_update()
-
-    # returns the path itself
-    def Get_Path(self):
-        return self
 
     # Returns list of edges of the path without alleviation waypoints
     def Compute_simple_edges(self):
@@ -298,5 +291,6 @@ class Path:
     # find total distance of path plus an extra waypoint
     def Path_distance_to_waypoint(self, Next_waypoint):
         Last_node = self.Waypoint_list[len(self.Waypoint_list) - 1]
+        self.Distance_2d_update()
         return self.Simple_distance_2d + Geometrical_functions.Distance_2d(Last_node.Point_2d(),
                                                                            Next_waypoint.Point_2d())
