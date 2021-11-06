@@ -523,7 +523,6 @@ class Dashboard:
 
     """Draw paths of a certain type depending on the path display mode"""
     def Draw_paths(self):
-        print(self.Map_scaling)
         Straight_2D_paths_list = self.Mission_profile.Straight_2D_paths_list
         Curved_2D_paths_list = self.Mission_profile.Curved_2D_paths_list
         Curved_3D_paths_list = self.Mission_profile.Curved_3D_paths_list
