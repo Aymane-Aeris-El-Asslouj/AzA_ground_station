@@ -198,7 +198,7 @@ def generate_plan(boundary, waypoints, center):
     item['params'] = [(15 if i == 0 else 0), 0, 0, None, x, y, 50]
     wayp.append(item)
   plan['mission']['items'] = wayp
-  with open('aza.plan', 'w') as f:
+  with open('../extra files/aza.plan', 'w') as f:
     json.dump(plan, f)
     
 

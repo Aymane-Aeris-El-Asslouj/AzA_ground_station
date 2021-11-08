@@ -1,6 +1,6 @@
 import math
 import Geometrical_functions as G_f
-import Path_functions as P_f
+import path_functions as P_f
 import Parameters as Para
 
 OBSTACLE_DISTANCE_FOR_VALID_PASS = Para.OBSTACLE_DISTANCE_FOR_VALID_PASS

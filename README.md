@@ -17,5 +17,5 @@ GUI instructions:
 > • The current algorithm will show two possible paths for each two waypoints in different colors. That color itself alternates for the same path between waypoints  
 > • If no path can be found, you will get a message in the console "Error: no path found"  
 
-![Diagrams/AzA_Avionics_diagram.jpg](Diagrams/AzA_Avionics_diagram.jpg)
-![Diagrams/Path_finder_diagram.jpg](Diagrams/Path_finder_diagram.jpg)
+![Diagrams/AzA_Avionics_diagram.jpg](doc/AzA_Avionics_diagram.jpg)
+![Diagrams/Path_finder_diagram.jpg](doc/Path_finder_diagram.jpg)

@@ -1,5 +1,5 @@
 import math
-import Parameters as Para
+import parameters as Para
 
 FLOAT_DIFFERENCE_FOR_EQUALITY = Para.FLOAT_DIFFERENCE_FOR_EQUALITY
 

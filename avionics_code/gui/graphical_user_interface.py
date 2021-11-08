@@ -1,9 +1,7 @@
 import pygame
 import sys
 
-import Geometrical_functions as G_f
-import Parameters as Para
-
+from Code.Helpers import Geometrical_functions as G_f, Parameters as Para
 
 COLOR_OFFSET_FOR_PATH = Para.COLOR_OFFSET_FOR_PATH
 DEFAULT_MAP_SIZE = Para.DEFAULT_MAP_SIZE
@@ -51,7 +49,7 @@ class Dashboard:
         pygame.init()
         pygame.display.set_caption('Dashboard')
         self.screen = pygame.display.set_mode((DASHBOARD_SIZE*1.2, DASHBOARD_SIZE))
-        self.background = pygame.image.load('Background.png').convert()
+        self.background = pygame.image.load('../extra files/background.png').convert()
 
         # text of selection menu
         pygame.font.init()

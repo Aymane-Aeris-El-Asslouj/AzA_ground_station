@@ -1,4 +1,4 @@
-import Path_objects as P_o
+from Code.Path import Path_objects as P_o
 import Parameters as Para
 import copy
 import Geometrical_functions as G_f
