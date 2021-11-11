@@ -1,15 +1,16 @@
-# All distances are in feet, otherwise sizes are in pixel
+"""Parameters for whole code to access,
+All distances are in feet, otherwise sizes are in pixel"""
 
 # Constants
 FEET_PER_METER = 3.280839895
 FLOAT_DIFFERENCE_FOR_EQUALITY = 0.00001
+MAP_REF = {"latitude": 38.14468, "longitude": -76.428022}
 
 # Dashboard parameters
 DASHBOARD_SIZE = 650  # default 650 (in pixels) size of dashboard
 WAYPOINT_SIZE = 4  # (in pixels) size of waypoints on dashboard
-SELECTION_MENU_POSITION = 40  # (in pixels) position of selection menu buttons on dashboard
 COLOR_OFFSET_FOR_PATH = 0.5  # (0 to 1 range) Color offset between each two parts of a path for distinguishing them
-DEFAULT_MAP_SIZE = 6000  # (ft) map size for empty map (a little bit higher than default map)
+DEFAULT_MAP_SIZE = 6000  # (ft) map size * don't change it cause the background doesn't scale with it*
 
 # Path finding parameters
 PATHS_PER_WAYPOINTS = 2  # number of paths to find between each two waypoints

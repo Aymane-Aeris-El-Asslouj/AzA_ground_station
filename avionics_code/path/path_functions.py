@@ -1,12 +1,25 @@
-from Code.Path import Path_objects as P_o
-import Parameters as Para
+import path.path_objects as p_o
+import helpers.parameters as para
 import copy
-import Geometrical_functions as G_f
+import helpers.geometrical_functions as g_f
 
-PATHS_PER_WAYPOINTS = Para.PATHS_PER_WAYPOINTS
-MAX_ATTEMPTS_PER_WAYPOINTS = Para.MAX_ATTEMPTS_PER_WAYPOINTS
-VARIATIONS_FOR_PATH_BUILDING = Para.VARIATIONS_FOR_PATH_BUILDING
-MAX_CLIMBING_RATIO = Para.MAX_CLIMBING_RATIO
+PATHS_PER_WAYPOINTS = para.PATHS_PER_WAYPOINTS
+MAX_ATTEMPTS_PER_WAYPOINTS = para.MAX_ATTEMPTS_PER_WAYPOINTS
+VARIATIONS_FOR_PATH_BUILDING = para.VARIATIONS_FOR_PATH_BUILDING
+MAX_CLIMBING_RATIO = para.MAX_CLIMBING_RATIO
+
+
+def Compute_path(self):
+    if len(self.Mission_waypoint_list) > 0:
+        self.Straight_2D_paths_list = p_f.Straight_2D_path_finder(self)
+        self.Curved_2D_paths_list = p_f.Curving_2D(self, self.Straight_2D_paths_list)
+        self.Curved_3D_paths_list = p_f.Altitude_extension(self.Curved_2D_paths_list)
+        self.Chosen_3D_path = p_f.Path_selector(self.Curved_3D_paths_list)
+    else:
+        self.Straight_2D_paths_list = list()
+        self.Curved_2D_paths_list = list()
+        self.Curved_3D_paths_list = list()
+        self.Chosen_3D_path = list()
 
 """from a set of 2d waypoints, returns a list of 2d
 straight paths that connect them while avoiding obstacles
@@ -37,7 +50,7 @@ def Straight_2D_path_finder(Mission_profile):
         List_of_paths_found = list()
         Current_waypoint = True_waypoint_list[Waypoint_index]
         Next_waypoint = True_waypoint_list[Waypoint_index + 1]
-        Paths_being_searched = [P_o.Path([Current_waypoint])]
+        Paths_being_searched = [p_o.Path([Current_waypoint])]
 
         # avoid endless search
         Attempts = 0
@@ -62,7 +75,7 @@ def Straight_2D_path_finder(Mission_profile):
 
             # check if we can connect the Last_node to the next waypoint
             if Last_node.Is_connectable_to(Next_waypoint, Mission_profile):
-                Path_extensions.append(P_o.Path(Best_path.Waypoint_list + [Next_waypoint]))
+                Path_extensions.append(p_o.Path(Best_path.Waypoint_list + [Next_waypoint]))
 
             # extend path by connecting it to nodes created on obstacles
             for Obstacle_i in Obstacles:
@@ -70,14 +83,14 @@ def Straight_2D_path_finder(Mission_profile):
                 Node_1, Node_2 = Obstacle_i.Create_tangent_nodes(Last_node)
                 if Node_1 is not None:
                     if Last_node.Is_connectable_to(Node_1, Mission_profile):
-                        Path_extensions.append(P_o.Path(Best_path.Waypoint_list + [Node_1]))
+                        Path_extensions.append(p_o.Path(Best_path.Waypoint_list + [Node_1]))
                     if Last_node.Is_connectable_to(Node_2, Mission_profile):
-                        Path_extensions.append(P_o.Path(Best_path.Waypoint_list + [Node_2]))
+                        Path_extensions.append(p_o.Path(Best_path.Waypoint_list + [Node_2]))
 
             # extend path by connecting it to nodes created on border
             for Node_i in Border_nodes:
                 if Last_node.Is_connectable_to(Node_i, Mission_profile):
-                    Path_extensions.append(P_o.Path(Best_path.Waypoint_list + [Node_i]))
+                    Path_extensions.append(p_o.Path(Best_path.Waypoint_list + [Node_i]))
 
             """add extensions of best path that did not reach
             the next waypoint yet to the list of paths
@@ -158,7 +171,7 @@ def Curving_2D(Mission_profile, Straight_2D_paths_list):
             # run over all possible variations with Variation_num changes
             Path_vector = [0]*(len(Paths_list))
             if sum(Distribution) != 0:
-                G_f.Increment_bound_var(Path_vector, Distribution, Max_per_group, Variation_num)
+                g_f.Increment_bound_var(Path_vector, Distribution, Max_per_group, Variation_num)
 
             while len(Path_vector) > 0:
                 # Select the paths that were picked
@@ -169,15 +182,15 @@ def Curving_2D(Mission_profile, Straight_2D_paths_list):
                 # Stitch them
                 W_list = sum(list(Path_i.Waypoint_list[1:] for Path_i in Path_to_stitch), [])
                 Stitched_waypoint_list = copy.deepcopy([Path_to_stitch[0].Waypoint_list[0]] + W_list)
-                Stitched_path = P_o.Path(Stitched_waypoint_list)
+                Stitched_path = p_o.Path(Stitched_waypoint_list)
 
                 # Curve, generate off shoot points, and check if path is valid
                 Stitched_path.Curve(Mission_profile)
                 Stitched_path.Off_shoot()
                 if Stitched_path.Is_valid(Mission_profile):
                     Curved_paths_found.append(Stitched_path)
-                G_f.Increment_bound_var(Path_vector, Distribution, Max_per_group, Variation_num)
-            G_f.Distribution_increment(Distribution, Variation_num)
+                g_f.Increment_bound_var(Path_vector, Distribution, Max_per_group, Variation_num)
+            g_f.Distribution_increment(Distribution, Variation_num)
 
     return Curved_paths_found
 
@@ -200,7 +213,7 @@ def Altitude_extension(Curved_2D_paths_list):
                 Selected_waypoints.append(Waypoint_i)
             else:
                 Selected_waypoints.append(Waypoint_i)
-                Selected_sub_path = P_o.Path(Selected_waypoints)
+                Selected_sub_path = p_o.Path(Selected_waypoints)
                 Altitude_change = Waypoint_i.z - Selected_waypoints[0].z
                 Distance_traveled = Selected_sub_path.Compute_simple_distance_2d()
                 if Distance_traveled != 0:

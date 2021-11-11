@@ -1,568 +1,482 @@
 import pygame
-import sys
 
-from Code.Helpers import Geometrical_functions as G_f, Parameters as Para
+from avionics_code.helpers import geometrical_functions as g_f, parameters as para, global_variables as g_v
 
-COLOR_OFFSET_FOR_PATH = Para.COLOR_OFFSET_FOR_PATH
-DEFAULT_MAP_SIZE = Para.DEFAULT_MAP_SIZE
-DASHBOARD_SIZE = Para.DASHBOARD_SIZE
-WAYPOINT_SIZE = Para.WAYPOINT_SIZE*(DASHBOARD_SIZE/650)
-SELECTION_MENU_POSITION = Para.SELECTION_MENU_POSITION*(DASHBOARD_SIZE/650)
-PREFERRED_TURN_RADIUS = Para.PREFERRED_TURN_RADIUS
-
-'''Dashboard window: initialize > update > start events
-Shows map data, flight data, and current path
-************GUI instructions************
-• Click on the dots in the selection menu up-left to go into
-mission_waypoint(blue)/obstacle(white)/border(yellow) input mode
-• For waypoints and border vertices, click once to place them. Click on a
-waypoint/border_vertex to select it for placing a waypoint/border_vertex after it
-• For Obstacles, click at where you want the obstacle to be, then drag to select the radius
-• To delete any object (waypoint/obstacle/border_vertex), right click on it
-• To delete all objects of a certain type, right click on the dot in the
-selection menu that corresponds to it
-• The current algorithm will show two possible paths for each two waypoints
-in different colors. That color itself alternates for the same path between waypoints
-• Parameters for the GUI are in the Parameters module'''
+COLOR_OFFSET_FOR_PATH = para.COLOR_OFFSET_FOR_PATH
+DEFAULT_MAP_SIZE = para.DEFAULT_MAP_SIZE
+DASHBOARD_SIZE = para.DASHBOARD_SIZE
+WAYPOINT_SIZE = para.WAYPOINT_SIZE * (DASHBOARD_SIZE / 650)
+PREFERRED_TURN_RADIUS = para.PREFERRED_TURN_RADIUS
 
 
-class Dashboard:
+class GUI:
+    """Handles the dashboard display"""
 
-    """Initialize Dashboard"""
-    def __init__(self, Mission_profile):
-        # Dashboard variables that define what is displayed, selected, and inputted
-        self.Path_display_mode = 0  # (0: straight paths, 1: curved paths, 2: 3D paths, 3: selected path)
-        self.Input_type = 0  # (0:waypoints, 1:obstacles, 2:border vertices
-        self.Inputing = 0  # whether there is a current input being done (probably obstacle input)
-        self.Input_position = (0, 0)  # position in which a current input is being done (probably obstacle input)
-        self.Selected_waypoint = 0  # selected waypoint
-        self.Selected_vertex = 0  # selected border vertex
-        self.Selected_path = 0  # path to show
-
-        # Make a reference to mission profile and to obstacles/Border/Mission_list
-        self.Mission_profile = Mission_profile
+    def __init__(self):
+        # dashboard variables that define what is displayed, selected, and inputted
+        # (0: straight paths, 1: curved paths, 2: 3d paths, 3: selected path)
+        self.path_display_mode = 0
+        # (0:waypoints, 1:obstacles, 2:border vertices, etc)
+        self.input_type = 0
+        # whether there is a current input being done (probably obstacle input)
+        self.inputing = 0
+        # position in which a current input is being done (probably obstacle input)
+        self.input_position = (0, 0)
+        # selected map objects
+        self.selection = [0]*9
+        # path to show
+        self.selected_path = 0
 
         # set the map_scaling to fit it
-        self.Map_scaling = float('+inf')
+        self.map_scaling = DASHBOARD_SIZE / DEFAULT_MAP_SIZE
 
-        # Dashboard initialization
+        # dashboard initialization
         pygame.init()
-        pygame.display.set_caption('Dashboard')
-        self.screen = pygame.display.set_mode((DASHBOARD_SIZE*1.2, DASHBOARD_SIZE))
-        self.background = pygame.image.load('../extra files/background.png').convert()
+        pygame.display.set_caption('GUI')
+        self.screen = pygame.display.set_mode((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE))
+        self.background = pygame.image.load('extra files/background.png').convert()
+        self.background = pygame.transform.scale(self.background, (DASHBOARD_SIZE, DASHBOARD_SIZE))
 
-        # text of selection menu
+        # initializes the selection menu
         pygame.font.init()
-        self.Font = pygame.font.SysFont('Arial', int(14*(DASHBOARD_SIZE/650)))
-        self.Text_waypoint = self.Font.render('Waypoint', True, (0, 0, 255))
-        self.Text_obstacle = self.Font.render('Obstacle', True, (255, 255, 255))
-        self.Text_border = self.Font.render('Border', True, (200, 0, 0))
-        self.Text_display = self.Font.render('Display Mode:', True, (255, 255, 255))
-        self.Text_mode_1 = self.Font.render('Straight_paths', True, (255, 255, 255))
-        self.Text_mode_2 = self.Font.render('Curved_paths', True, (255, 255, 255))
-        self.Text_mode_3 = self.Font.render('3D_paths', True, (255, 255, 255))
-        self.Text_mode_4 = self.Font.render('Chosen_path', True, (255, 255, 255))
-        self.Text_path = self.Font.render('Selected path:', True, (255, 255, 255))
-        self.Text_select = self.Font.render('<--             -->', True, (255, 255, 255))
+        self.font = None
+        self.buttons = None
+        self.input_type_dict = None
+        self.texts = None
+        self.status_type_dict = None
+        self.interface_init()
 
-    """Check for interface inputs"""
-    def GUI_input_manager_start(self):
-        while True:
+    def display_update(self):
+        """Update the display"""
 
-            # Check if some input that would require a screen update was done
-            Input_done = False
-
-            # to check if path computation is needed
-            Compute = False
-
-            # check interface inputs
-            for event in pygame.event.get():
-
-                # if the user starts clicking, add the object or delete
-                # the object they want, or record their input
-                if event.type == pygame.MOUSEBUTTONDOWN:
-
-                    # get position of the cursor
-                    Cursor_position = pygame.mouse.get_pos()
-                    # Check if the user is selecting a certain object type
-                    # to input (left click) or trying to delete all instances
-                    # of the object type (right click), or changing display mode
-                    D_S = DASHBOARD_SIZE
-                    if Cursor_position[0] > D_S:
-                        if G_f.Distance_2d(Cursor_position, (D_S * 1.1, 1.0 * D_S / 15)) < (2 * WAYPOINT_SIZE):
-                            if pygame.mouse.get_pressed()[0]:
-                                self.Input_type = 0
-                                Input_done = True
-                            else:
-                                self.Mission_profile.Clear_waypoints()
-                                Compute = True
-
-                        elif G_f.Distance_2d(Cursor_position, (D_S * 1.1, 2.0 * D_S / 15)) < (2 * WAYPOINT_SIZE):
-                            if pygame.mouse.get_pressed()[0]:
-                                self.Input_type = 1
-                                Input_done = True
-                            else:
-                                self.Mission_profile.Clear_obstacles()
-                                Compute = True
-
-                        elif G_f.Distance_2d(Cursor_position, (D_S * 1.1, 3.0 * D_S / 15)) < (2 * WAYPOINT_SIZE):
-                            if pygame.mouse.get_pressed()[0]:
-                                self.Input_type = 2
-                                Input_done = True
-                            else:
-                                self.Mission_profile.Clear_border()
-                                Compute = True
-
-                        elif G_f.Distance_2d(Cursor_position, (D_S * 1.02, 5.0 * D_S / 15)) < (2 * WAYPOINT_SIZE):
-                            if pygame.mouse.get_pressed()[0]:
-                                self.Path_display_mode = 0
-                                self.clamp_display_mode()
-                                Input_done = True
-
-                        elif G_f.Distance_2d(Cursor_position, (D_S * 1.02, 5.5 * D_S / 15)) < (2 * WAYPOINT_SIZE):
-                            if pygame.mouse.get_pressed()[0]:
-                                self.Path_display_mode = 1
-                                self.clamp_display_mode()
-                                Input_done = True
-
-                        elif G_f.Distance_2d(Cursor_position, (D_S * 1.02, 6.0 * D_S / 15)) < (2 * WAYPOINT_SIZE):
-                            if pygame.mouse.get_pressed()[0]:
-                                self.Path_display_mode = 2
-                                self.clamp_display_mode()
-                                Input_done = True
-
-                        elif G_f.Distance_2d(Cursor_position, (D_S * 1.02, 6.5 * D_S / 15)) < (2 * WAYPOINT_SIZE):
-                            if pygame.mouse.get_pressed()[0]:
-                                self.Path_display_mode = 3
-                                self.clamp_display_mode()
-                                Input_done = True
-
-                        elif G_f.Distance_2d(Cursor_position, (D_S * 1.08, 8.5 * D_S / 15)) < (2 * WAYPOINT_SIZE):
-                            if pygame.mouse.get_pressed()[0]:
-                                if self.Selected_path != 0:
-                                    self.Selected_path -= 1
-                                Input_done = True
-
-                        elif G_f.Distance_2d(Cursor_position, (D_S * 1.12, 8.5 * D_S / 15)) < (2 * WAYPOINT_SIZE):
-                            if pygame.mouse.get_pressed()[0]:
-                                self.Selected_path += 1
-                                self.clamp_display_mode()
-                                Input_done = True
-
-                    # if the user is not interacting with the input menu, then add whatever they want to input
-                    # (left click) or delete whatever they are trying to delete (right click)
-                    else:
-                        # to check if the user is click on the map with nothing on its way (need nothing in the way
-                        # to create an obstacle/waypoint/border vertex)
-                        contact = False
-
-                        # delete any obstacle they are trying to delete (right click on it)
-                        Obstacles = self.Mission_profile.Obstacles
-                        i = 0
-                        while i < len(Obstacles):
-                            Obstacle_i_dash_xy = self.Dashboard_projection(Obstacles[i])
-                            Cursor_to_obstacle = G_f.Distance_2d(Cursor_position, Obstacle_i_dash_xy)
-                            Obstacle_i_dash_r = Obstacles[i].r * self.Map_scaling
-                            if Cursor_to_obstacle < Obstacle_i_dash_r:
-                                contact = True
-                                if pygame.mouse.get_pressed()[0]:
-                                    i += 1
-                                else:
-                                    self.Mission_profile.Delete_obstacle(i)
-                                    Compute = True
-                            else:
-                                i += 1
-
-                        # delete any border vertex they are trying to delete (right click on it) or select one (left
-                        # click)
-                        Vertex_list = self.Mission_profile.Border.Vertex_list
-                        i = 0
-                        while i < len(Vertex_list):
-                            Vertex_dash_xy = self.Dashboard_projection(Vertex_list[i])
-                            Cursor_to_vertex = G_f.Distance_2d(Cursor_position, Vertex_dash_xy)
-                            if Cursor_to_vertex < WAYPOINT_SIZE:
-                                contact = True
-                                if pygame.mouse.get_pressed()[0]:
-                                    self.Selected_vertex = i % max(len(Vertex_list), 1)
-                                    i += 1
-                                    self.Input_type = 2
-                                    Input_done = True
-                                else:
-                                    self.Mission_profile.Delete_vertex(i)
-                                    if i <= self.Selected_vertex:
-                                        self.Selected_vertex -= 1
-                                        self.Selected_vertex %= max(len(Vertex_list), 1)
-                                    Compute = True
-                            else:
-                                i += 1
-
-                        # delete any waypoint they are trying to delete
-                        # (right click on it) or select one (left click)
-                        Mission_list = self.Mission_profile.Mission_waypoint_list
-                        i = 0
-                        while i < len(Mission_list):
-                            Waypoint_dash_xy = self.Dashboard_projection(Mission_list[i])
-                            Cursor_to_waypoint = G_f.Distance_2d(Cursor_position, Waypoint_dash_xy)
-                            if Cursor_to_waypoint < WAYPOINT_SIZE:
-                                contact = True
-                                if pygame.mouse.get_pressed()[0]:
-                                    self.Selected_waypoint = i % max(len(Mission_list), 1)
-                                    i += 1
-                                    self.Input_type = 0
-                                    Input_done = True
-                                else:
-                                    self.Mission_profile.Delete_waypoint(i)
-                                    if i <= self.Selected_waypoint and len(Mission_list) > 0:
-                                        self.Selected_waypoint -= 1
-                                        self.Selected_waypoint %= max(1, len(Mission_list))
-                                    Compute = True
-                            else:
-                                i += 1
-
-                        # if the user is click on the map, add the object they want to add
-                        if not contact and pygame.mouse.get_pressed()[0]:
-                            if self.Input_type == 0:
-                                Mission_list = self.Mission_profile.Mission_waypoint_list
-                                Cursor_on_map = self.Map_projection(Cursor_position)
-                                self.Mission_profile.Add_waypoint(self.Selected_waypoint + 1, Cursor_on_map)
-                                self.Selected_waypoint += 1
-                                self.Selected_waypoint %= max(1, len(Mission_list))
-                                Compute = True
-                                if len(Mission_list) == 2:
-                                    self.Selected_waypoint = 1
-
-                            elif self.Input_type == 1:
-                                self.Inputing = 1
-                                self.Input_position = Cursor_position
-                            elif self.Input_type == 2:
-                                Vertex_list = self.Mission_profile.Border.Vertex_list
-                                Cursor_on_map = self.Map_projection(Cursor_position)
-                                self.Mission_profile.Add_vertex(self.Selected_vertex + 1, Cursor_on_map)
-                                self.Selected_vertex += 1
-                                self.Selected_vertex %= max(1, len(Vertex_list))
-                                Compute = True
-                                if len(Vertex_list) == 2:
-                                    self.Selected_vertex = 1
-
-                # When user releases click, add the input made to map info if it was an obstacle
-                if event.type == pygame.MOUSEBUTTONUP:
-
-                    # get cursor position
-                    Cursor_position = pygame.mouse.get_pos()
-
-                    # if inputing obstacle, add it
-                    if self.Inputing == 1:
-                        self.Inputing = 0
-                        Input_position_to_cursor_distance = G_f.Distance_2d(
-                            self.Map_projection(self.Input_position),
-                            self.Map_projection(Cursor_position))
-                        Input_on_map = self.Map_projection(self.Input_position)
-                        if Input_position_to_cursor_distance > 10:
-                            self.Mission_profile.Add_obstacle((Input_on_map, Input_position_to_cursor_distance))
-                        Compute = True
-
-                # Close Dashboard if prompted to, and quit the program
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-
-            # if some interface input that changed mission info was made, update the path
-            if Compute:
-                self.Mission_profile.Compute_path()
-                self.Display_update()
-
-            # if some interface input was made that changed the path, update the display
-            if (self.Inputing == 1) or Input_done and (not Compute):
-                self.Display_update()
-            pygame.display.update()
-
-    """Update the display"""
-    def Display_update(self):
-
-        # load info from Mission profile
-        Current_position = self.Mission_profile.Current_position
-        Mission_waypoint_list = self.Mission_profile.Mission_waypoint_list
-        Obstacles = self.Mission_profile.Obstacles
-        Border = self.Mission_profile.Border
-
-        # rescale map
-        self.Rescale()
-        self.screen.fill((110, 0, 200))
+        # fill background
+        self.screen.fill((205, 133, 63))
         self.screen.blit(self.background, (0, 0))
 
         # draw control menu
-        self.Draw_control_menu()
+        self.draw_control_menu()
 
-        # draw the border (edges of border and border vertexes with the ones selected being bigger)
-        self.Draw_Edges(Border, Color=(200, 0, 0))
-        self.Draw_rescaled_points(Border.Vertex_list, self.Selected_vertex, Color=(200, 0, 0))
+        # draw mission profile info (map)
+        self.draw_mission_profile()
 
-        # draw obstacles in white
-        for Obstacle_i in Obstacles:
-            Obstacle_i_dash_xy = self.Dashboard_projection(Obstacle_i)
-            Obstacle_i_dash_r = Obstacle_i.r * self.Map_scaling
-            pygame.draw.circle(self.screen, (255, 255, 255), Obstacle_i_dash_xy, Obstacle_i_dash_r)
-
-        # draw the obstacle that is being inputted if there is one
-        if self.Inputing == 1:
-            Inputing_radius = G_f.Distance_2d(self.Input_position, pygame.mouse.get_pos())
-            pygame.draw.circle(self.screen, (255, 255, 255), self.Input_position, Inputing_radius)
-
-        # Draw paths depending on the display mode
-        self.Draw_paths()
-
-        # draw mission waypoints on top of Final path in black
-        self.Draw_rescaled_points(Mission_waypoint_list, self.Selected_waypoint, (0, 0, 255))
+        # draw paths depending on the display mode
+        # ## self.draw_paths()
 
         # draw starting position on top of Mission waypoints in grey
-        Current_position_dash = self.Dashboard_projection(Current_position)
-        pygame.draw.circle(self.screen, (50, 50, 50), Current_position_dash, 1.5 * WAYPOINT_SIZE)
+        # ##Current_position_dash = self.dashboard_projection(Current_position)
+        # ##pygame.draw.circle(self.screen, (50, 50, 50), Current_position_dash, 1.5 * WAYPOINT_SIZE)
 
-    """draw a list of map objects with the one selected and the previous one being bigger"""
-    def Draw_rescaled_points(self, Map_object_list, Selected, Color):
-        for i in range(len(Map_object_list)):
-            Is_selected_1 = Selected % max(1, len(Map_object_list)) == i
-            Is_selected_2 = (Selected + 1) % max(1, len(Map_object_list)) == i
-            if Is_selected_1 or Is_selected_2:
-                Waypoint_size = WAYPOINT_SIZE * 1.5
+    def draw_rescaled_points(self, surface, map_object_list, selected, color, type=0):
+        """draw a list of map objects with the one
+        selected and the previous one being bigger"""
+
+        for i in range(len(map_object_list)):
+            is_selected_1 = selected % max(1, len(map_object_list)) == i
+            is_selected_2 = (selected + 1) % max(1, len(map_object_list)) == i
+            if is_selected_1 or is_selected_2:
+                waypoint_size = WAYPOINT_SIZE * 1.5
             else:
-                Waypoint_size = WAYPOINT_SIZE
-            Vertex_dash = self.Dashboard_projection(Map_object_list[i])
-            pygame.draw.circle(self.screen, Color, Vertex_dash, Waypoint_size)
+                waypoint_size = WAYPOINT_SIZE
+            vertex_dash = self.dashboard_projection(map_object_list[i])
+            if type == 0:
+                pygame.draw.circle(surface, color, vertex_dash, waypoint_size)
+            elif type == 1:
+                w_s = waypoint_size
+                pairs = [(1, 0), (0, 1), (-1, 0), (0, -1)]
+                points = [(vertex_dash[0] + w_s * pair[0], vertex_dash[1] + w_s * pair[1]) for pair in pairs]
+                pygame.draw.polygon(self.screen, color, points)
 
-    """draw waypoints of path including alleviation waypoints, offshoot waypoints
-    and optionally altitude"""
-    def Draw_path_points(self, Path, Color, Altitude=False):
-        for i in range(len(Path.Waypoint_list)):
-            Vertex_dash_1 = self.Dashboard_projection(Path.Waypoint_list[i])
-            pygame.draw.circle(self.screen, Color, Vertex_dash_1, WAYPOINT_SIZE)
-            if Altitude:
-                self.Draw_text_off(Vertex_dash_1, str(int(Path.Waypoint_list[i].z))+" ft")
-            Vertex_off_w = Path.Waypoint_list[i].Off_waypoint
+    def draw_path_points(self, path, color, altitude=False):
+        """draw waypoints of path including alleviation waypoints, offshoot waypoints
+        and optionally altitude"""
+
+        for i in range(len(path.waypoint_list)):
+            vertex_dash_1 = self.dashboard_projection(path.waypoint_list[i])
+            pygame.draw.circle(self.screen, color, vertex_dash_1, WAYPOINT_SIZE)
+            if altitude:
+                self.draw_text_off(vertex_dash_1, str(int(path.waypoint_list[i].z)) + " ft")
+            vertex_off_w = path.waypoint_list[i].off_waypoint
             # draw offshoot waypoint if there is
-            if Vertex_off_w is not None:
-                if Vertex_off_w.x is not None:
-                    Vertex_off = self.Dashboard_projection(Vertex_off_w)
-                    pygame.draw.circle(self.screen, (0, 255, 0), Vertex_off, WAYPOINT_SIZE)
+            if vertex_off_w is not None:
+                if vertex_off_w.x is not None:
+                    vertex_off = self.dashboard_projection(vertex_off_w)
+                    pygame.draw.circle(self.screen, (0, 255, 0), vertex_off, WAYPOINT_SIZE)
             # draw alleviation waypoint if there is
-            if Path.Waypoint_list[i].Alleviation_waypoint is not None:
-                Alleviation_waypoint = Path.Waypoint_list[i].Alleviation_waypoint
-                Vertex_dash_mid = self.Dashboard_projection(Alleviation_waypoint)
-                pygame.draw.circle(self.screen, (255, 105, 180), Vertex_dash_mid, WAYPOINT_SIZE)
-                if Altitude:
-                    pass #  self.Draw_text_off(Vertex_dash_mid, str(int(Alleviation_waypoint.z))+" ft")
+            if path.waypoint_list[i].alleviation_waypoint is not None:
+                alleviation_waypoint = path.waypoint_list[i].alleviation_waypoint
+                vertex_dash_mid = self.dashboard_projection(alleviation_waypoint)
+                pygame.draw.circle(self.screen, (255, 105, 180), vertex_dash_mid, WAYPOINT_SIZE)
+                if altitude:
+                    pass  # self.draw_text_off(vertex_dash_mid, str(int(alleviation_waypoint.z))+" ft")
 
-    """draw edges of map structure"""
-    def Draw_Edges(self, Map_structure, Color):
-        Edges_to_draw = Map_structure.Compute_simple_edges()
-        for Edge in Edges_to_draw:
-            Vertex_1_dash = self.Dashboard_projection(Edge[0])
-            Vertex_2_dash = self.Dashboard_projection(Edge[1])
-            pygame.draw.line(self.screen, Color, Vertex_1_dash, Vertex_2_dash, width=2)
+    def draw_edges(self, map_structure, color):
+        """draw edges of map structure"""
 
-    """draw edges of map structure including alleviation and off shoot waypoints"""
-    def Draw_Edges_alleviated_offset(self, Map_structure, Color):
-        Edges_to_draw = Map_structure.Compute_simple_edges()
-        for index, Edge in enumerate(Edges_to_draw):
+        edges_to_draw = map_structure.compute_simple_edges()
+        for edge in edges_to_draw:
+            vertex_1_dash = self.dashboard_projection(edge[0])
+            vertex_2_dash = self.dashboard_projection(edge[1])
+            pygame.draw.line(self.screen, color, vertex_1_dash, vertex_2_dash, width=2)
+
+    def draw_edges_alleviated_offset(self, map_structure, color):
+        """draw edges of map structure including alleviation and off shoot waypoints"""
+
+        edges_to_draw = map_structure.compute_simple_edges()
+        for index, edge in enumerate(edges_to_draw):
             """This part gets points to draw"""
             # Get previous vertex or its off shoot waypoint if it exists
-            Vertex_1 = self.Dashboard_projection(Edge[0])
-            if Edge[0].Off_waypoint is not None:
-                if Edge[0].Off_waypoint.x is not None:
-                    Vertex_1 = self.Dashboard_projection(Edge[0].Off_waypoint)
+            vertex_1 = self.dashboard_projection(edge[0])
+            if edge[0].off_waypoint is not None:
+                if edge[0].off_waypoint.x is not None:
+                    vertex_1 = self.dashboard_projection(edge[0].off_waypoint)
             # Get next vertex
-            Vertex_2 = self.Dashboard_projection(Edge[1])
+            vertex_2 = self.dashboard_projection(edge[1])
             # If the next vertex has an off shoot waypoint, use it to find center
             # at that vertex
-            if Edge[1].Off_waypoint is not None:
-                if Edge[1].Off_waypoint.x is not None:
-                    Vertex_off = self.Dashboard_projection(Edge[1].Off_waypoint)
+            if edge[1].off_waypoint is not None:
+                if edge[1].off_waypoint.x is not None:
+                    vertex_off = self.dashboard_projection(edge[1].off_waypoint)
                 # Set zone to draw arcs around next vertex
-                Center = self.Dashboard_projection(Edge[1].Off_waypoint.Alleviation_waypoint)
-                Radius = G_f.Distance_2d(Center, Vertex_2)
-                Rect = (Center[0] - Radius, Center[1] - Radius, 2 * Radius, 2 * Radius)
+                center = self.dashboard_projection(edge[1].off_waypoint.alleviation_waypoint)
+                radius = g_f.distance_2d(center, vertex_2)
+                rect = (center[0] - radius, center[1] - radius, 2 * radius, 2 * radius)
 
-            """Drawing starts here"""
-            if Edge[1].Alleviation_waypoint is None:
+            """drawing starts here"""
+            if edge[1].alleviation_waypoint is None:
                 # draw line from off waypoint_1 to waypoint 2
                 """This part draws lines/areas from vertex 1 to vertex 2"""
-                if (Edge[0].Off_waypoint is not None and Edge[0].Off_waypoint.x is not None) or index == 0:
-                    pygame.draw.line(self.screen, Color, Vertex_1, Vertex_2, width=2)
+                if (edge[0].off_waypoint is not None and edge[0].off_waypoint.x is not None) or index == 0:
+                    pygame.draw.line(self.screen, color, vertex_1, vertex_2, width=2)
                 else:
                     # In the case where there is no offshoot waypoint, but a danger zone instead
-                    P_R = PREFERRED_TURN_RADIUS
-                    Off_center = G_f.Center_2d(Vertex_1, Vertex_2)
-                    pygame.draw.circle(self.screen, (0, 0, 0), Off_center, 2*P_R * self.Map_scaling, width=2)
+                    p_r = PREFERRED_TURN_RADIUS
+                    off_center = g_f.center_2d(vertex_1, vertex_2)
+                    pygame.draw.circle(self.screen, (0, 0, 0), off_center, 2 * p_r * self.map_scaling, width=2)
                 # draw arc from waypoint 2 to off waypoint
                 """This part draws arcs around vertex 2"""
-                if Edge[1].Off_waypoint is not None:
-                    if Edge[1].Off_waypoint.x is not None:
-                        A_1, A_2 = G_f.Find_arc_angles_dash(Vertex_1, Vertex_2, Vertex_off, Center)
+                if edge[1].off_waypoint is not None:
+                    if edge[1].off_waypoint.x is not None:
+                        a_1, a_2 = g_f.Find_arc_angles_dash(vertex_1, vertex_2, vertex_off, center)
                         # only non-zero arcs
-                        if abs(A_1-A_2) > 0.01:
-                            pygame.draw.arc(self.screen, (0, 255, 0), Rect, A_1, A_2, 2)
+                        if abs(a_1 - a_2) > 0.01:
+                            pygame.draw.arc(self.screen, (0, 255, 0), rect, a_1, a_2, 2)
             else:
                 # Get alleviation waypoint
-                Vertex_mid = self.Dashboard_projection(Edge[1].Alleviation_waypoint)
+                vertex_mid = self.dashboard_projection(edge[1].alleviation_waypoint)
                 # draw line from vertex 1 (or its off shoot waypoint) to alleviation waypoint
                 """This part draws lines/areas from vertex 1 to vertex 2"""
-                if index == 0 or (Edge[0].Off_waypoint is not None and Edge[0].Off_waypoint.x is not None):
-                    pygame.draw.line(self.screen, Color, Vertex_1, Vertex_mid, width=2)
+                if index == 0 or (edge[0].off_waypoint is not None and edge[0].off_waypoint.x is not None):
+                    pygame.draw.line(self.screen, color, vertex_1, vertex_mid, width=2)
                 else:
                     # In the case where there is no offshoot waypoint, but a danger zone instead
-                    P_R = PREFERRED_TURN_RADIUS
-                    Off_center = G_f.Center_2d(Vertex_1, Vertex_mid)
-                    pygame.draw.circle(self.screen, (0, 0, 0), Off_center, 2*P_R * self.Map_scaling, width=2)
+                    p_r = PREFERRED_TURN_RADIUS
+                    off_center = g_f.center_2d(vertex_1, vertex_mid)
+                    pygame.draw.circle(self.screen, (0, 0, 0), off_center, 2 * p_r * self.map_scaling, width=2)
                 """This part draws arcs around vertex 2"""
                 # draw arc from alleviation waypoint to vertex 2
-                A_1, A_2 = G_f.Find_arc_angles_dash(Vertex_1, Vertex_mid, Vertex_2, Center)
-                pygame.draw.arc(self.screen, (255, 105, 180), Rect, A_1, A_2, 2)
+                a_1, a_2 = g_f.Find_arc_angles_dash(vertex_1, vertex_mid, vertex_2, center)
+                pygame.draw.arc(self.screen, (255, 105, 180), rect, a_1, a_2, 2)
                 # draw arc from vertex 2 to off shoot waypoint
-                if Edge[1].Off_waypoint.x is not None:
-                    A_1, A_2 = G_f.Find_arc_angles_dash(Vertex_mid, Vertex_2, Vertex_off, Center)
+                if edge[1].off_waypoint.x is not None:
+                    a_1, a_2 = g_f.Find_arc_angles_dash(vertex_mid, vertex_2, vertex_off, center)
                     # only non-zero arcs
-                    if abs(A_1-A_2) > 0.01:
-                        pygame.draw.arc(self.screen, (0, 255, 0), Rect, A_1, A_2, 2)
+                    if abs(a_1 - a_2) > 0.01:
+                        pygame.draw.arc(self.screen, (0, 255, 0), rect, a_1, a_2, 2)
 
-    """project map object's position on the dashboard screen centered in the middle with proper scale"""
-    def Dashboard_projection(self, Map_object):
-        new_x = DASHBOARD_SIZE / 2 + Map_object.x * self.Map_scaling
-        new_y = DASHBOARD_SIZE / 2 - Map_object.y * self.Map_scaling
+    def dashboard_projection(self, map_object):
+        """project map object's position on the dashboard screen
+        centered in the middle with proper scale"""
+
+        new_x = DASHBOARD_SIZE / 2 + map_object.pos[0] * self.map_scaling
+        new_y = DASHBOARD_SIZE / 2 - map_object.pos[1] * self.map_scaling
         return new_x, new_y
 
-    """project dashboard position on the map with proper scale"""
-    def Map_projection(self, Dash_board_position):
-        inv_x = (Dash_board_position[0] - DASHBOARD_SIZE / 2) / self.Map_scaling
-        inv_y = (DASHBOARD_SIZE / 2 - Dash_board_position[1]) / self.Map_scaling
+    def map_projection(self, dash_board_position):
+        """project dashboard position on the map with proper scale"""
+
+        inv_x = (dash_board_position[0] - DASHBOARD_SIZE / 2) / self.map_scaling
+        inv_y = (DASHBOARD_SIZE / 2 - dash_board_position[1]) / self.map_scaling
         return inv_x, inv_y
 
-    """change the scaling of the map to fit the dashboard window"""
-    def Rescale(self):
-        Map_obj_list_1 = self.Mission_profile.Obstacles
-        Map_obj_list_2 = self.Mission_profile.Border.Vertex_list
-        Map_obj_list_3 = self.Mission_profile.Mission_waypoint_list
-        Map_objects_all = Map_obj_list_1 + Map_obj_list_2 + Map_obj_list_3
-        if len(Map_objects_all) == 0:
-            self.Map_scaling = (DASHBOARD_SIZE / DEFAULT_MAP_SIZE) * 0.90
-        else:
-            Map_objects_x = list(Map_object_i.x for Map_object_i in Map_objects_all)
-            Map_objects_y = list(Map_object_i.y for Map_object_i in Map_objects_all)
-            New_map_size = max(2 * abs(min(Map_objects_x)), 2 * abs(max(Map_objects_x)), 2 * abs(min(Map_objects_y)),
-                               2 * abs(max(Map_objects_y)))
-            self.Map_scaling = min((DASHBOARD_SIZE / (New_map_size + 1)) * 0.90,
-                                   (DASHBOARD_SIZE / DEFAULT_MAP_SIZE) * 0.90)
-
-    """Limit selected path to the number of paths available"""
     def clamp_display_mode(self):
-        Straight_2D_paths_list = self.Mission_profile.Straight_2D_paths_list
-        Curved_2D_paths_list = self.Mission_profile.Curved_2D_paths_list
-        Curved_3D_paths_list = self.Mission_profile.Curved_3D_paths_list
-        if self.Path_display_mode == 0:
-            if len(Straight_2D_paths_list) > 0:
-                Max = max(0, len(Straight_2D_paths_list[0])-1)
+        """Limit selected path to the number of paths available"""
+
+        straight_2d_paths_list = g_v.mp.straight_2d_paths_list
+        curved_2d_paths_list = g_v.mp.curved_2d_paths_list
+        curved_3d_paths_list = g_v.mp.curved_3d_paths_list
+        if self.path_display_mode == 0:
+            if len(straight_2d_paths_list) > 0:
+                max_size = max(0, len(straight_2d_paths_list[0]) - 1)
             else:
-                Max = 0
-        elif self.Path_display_mode == 1:
-            Max = max(0, len(Curved_2D_paths_list)-1)
-        elif self.Path_display_mode == 2:
-            Max = max(0, len(Curved_3D_paths_list)-1)
-        elif self.Path_display_mode == 3:
-            Max = 0
-        self.Selected_path = min(self.Selected_path, Max)
+                max_size = 0
+        elif self.path_display_mode == 1:
+            max_size = max(0, len(curved_2d_paths_list) - 1)
+        elif self.path_display_mode == 2:
+            max_size = max(0, len(curved_3d_paths_list) - 1)
+        elif self.path_display_mode == 3:
+            max_size = 0
+        self.selected_path = min(self.selected_path, max_size)
 
-    """Draws control menu"""
-    def Draw_control_menu(self):
-        D_S = DASHBOARD_SIZE
+    def draw_control_menu(self):
+        """draws control menu"""
 
-        pygame.draw.circle(self.screen, (0, 0, 255), (D_S * 1.1, 1.0 * D_S / 15), 2 * WAYPOINT_SIZE)
-        pygame.draw.circle(self.screen, (255, 255, 255), (D_S * 1.1, 2.0 * D_S / 15), 2 * WAYPOINT_SIZE)
-        pygame.draw.circle(self.screen, (200, 0, 0), (D_S * 1.1, 3.0 * D_S / 15), 2 * WAYPOINT_SIZE)
+        d_s = DASHBOARD_SIZE
+        RED = (255, 0, 0)
+        GREEN = (0, 255, 0)
 
-        if self.Input_type == 0:
-            pygame.draw.circle(self.screen, (0, 0, 255), (D_S * 1.1, 1.0 * D_S / 15), 3 * WAYPOINT_SIZE)
-        elif self.Input_type == 1:
-            pygame.draw.circle(self.screen, (255, 255, 255), (D_S * 1.1, 2.0 * D_S / 15), 3 * WAYPOINT_SIZE)
-        elif self.Input_type == 2:
-            pygame.draw.circle(self.screen, (200, 0, 0), (D_S * 1.1, 3.0 * D_S / 15), 3 * WAYPOINT_SIZE)
+        # change size of selected buttons
+        for key in self.input_type_dict:
+            if self.input_type == key:
+                B = self.buttons[self.input_type_dict[key]]
+                self.buttons[self.input_type_dict[key]] = (B[0], B[1], B[2], 3)
+            else:
+                B = self.buttons[self.input_type_dict[key]]
+                self.buttons[self.input_type_dict[key]] = (B[0], B[1], B[2], 2)
 
-        pygame.draw.circle(self.screen, (255, 0, 0), (D_S * 1.02, 5.0 * D_S / 15), 2 * WAYPOINT_SIZE)
-        pygame.draw.circle(self.screen, (255, 0, 0), (D_S * 1.02, 5.5 * D_S / 15), 2 * WAYPOINT_SIZE)
-        pygame.draw.circle(self.screen, (255, 0, 0), (D_S * 1.02, 6.0 * D_S / 15), 2 * WAYPOINT_SIZE)
-        pygame.draw.circle(self.screen, (255, 0, 0), (D_S * 1.02, 6.5 * D_S / 15), 2 * WAYPOINT_SIZE)
-        pygame.draw.circle(self.screen, (255, 0, 0), (D_S * 1.08, 8.5 * D_S / 15), 2 * WAYPOINT_SIZE)
-        pygame.draw.circle(self.screen, (255, 0, 0), (D_S * 1.12, 8.5 * D_S / 15), 2 * WAYPOINT_SIZE)
+        # change color of selected buttons
+        for key in self.status_type_dict:
+            if self.path_display_mode == key:
+                B = self.buttons[self.status_type_dict[key]]
+                self.buttons[self.status_type_dict[key]] = (GREEN, B[1], B[2], B[3])
+            else:
+                B = self.buttons[self.status_type_dict[key]]
+                self.buttons[self.status_type_dict[key]] = (RED, B[1], B[2], B[3])
 
-        if self.Path_display_mode == 0:
-            pygame.draw.circle(self.screen, (0, 255, 0), (D_S * 1.02, 5.0 * D_S / 15), 2 * WAYPOINT_SIZE)
-        elif self.Path_display_mode == 1:
-            pygame.draw.circle(self.screen, (0, 255, 0), (D_S * 1.02, 5.5 * D_S / 15), 2 * WAYPOINT_SIZE)
-        elif self.Path_display_mode == 2:
-            pygame.draw.circle(self.screen, (0, 255, 0), (D_S * 1.02, 6.0 * D_S / 15), 2 * WAYPOINT_SIZE)
-        elif self.Path_display_mode == 3:
-            pygame.draw.circle(self.screen, (0, 255, 0), (D_S * 1.02, 6.5 * D_S / 15), 2 * WAYPOINT_SIZE)
+        # for displaying buttons
+        for key in self.buttons:
+            B = self.buttons[key]
+            pygame.draw.circle(self.screen, B[0], (d_s * B[1], B[2] * d_s / 15), B[3] * WAYPOINT_SIZE)
 
-        Text_pos_1 = self.Text_waypoint.get_rect(center=(D_S * 1.1, 0.5 * D_S / 15))
-        Text_pos_2 = self.Text_obstacle.get_rect(center=(D_S * 1.1, 1.5 * D_S / 15))
-        Text_pos_3 = self.Text_border.get_rect(center=(D_S * 1.1, 2.5 * D_S / 15))
-        Text_pos_4 = self.Text_display.get_rect(center=(D_S * 1.1, 4.5 * D_S / 15))
-        Text_pos_5 = self.Text_display.get_rect(center=(D_S * 1.1, 8.0 * D_S / 15))
-        Text_pos_6 = self.Text_display.get_rect(center=(D_S * 1.1, 8.5 * D_S / 15))
+        # for displaying labels
+        for key in self.texts:
+            label = self.font.render(key, True, self.texts[key][0])
+            label_pos = label.get_rect(center=(d_s * self.texts[key][1], self.texts[key][2] * d_s / 15))
+            self.screen.blit(label, label_pos)
 
-        self.screen.blit(self.Text_waypoint, Text_pos_1)
-        self.screen.blit(self.Text_obstacle, Text_pos_2)
-        self.screen.blit(self.Text_border, Text_pos_3)
-        self.screen.blit(self.Text_display, Text_pos_4)
-        self.screen.blit(self.Text_mode_1, (D_S * 1.04, 4.85 * D_S / 15))
-        self.screen.blit(self.Text_mode_2, (D_S * 1.04, 5.35 * D_S / 15))
-        self.screen.blit(self.Text_mode_3, (D_S * 1.04, 5.85 * D_S / 15))
-        self.screen.blit(self.Text_mode_4, (D_S * 1.04, 6.35 * D_S / 15))
-        self.screen.blit(self.Text_path, Text_pos_5)
-        self.screen.blit(self.Text_select, Text_pos_6)
+    def draw_mission_profile(self):
+        """Displays information of the mission profile
+        border, obstacles, mission waypoints, etc"""
 
-    """Draw paths of a certain type depending on the path display mode"""
-    def Draw_paths(self):
-        Straight_2D_paths_list = self.Mission_profile.Straight_2D_paths_list
-        Curved_2D_paths_list = self.Mission_profile.Curved_2D_paths_list
-        Curved_3D_paths_list = self.Mission_profile.Curved_3D_paths_list
-        Chosen_3D_path = self.Mission_profile.Chosen_3D_path
+        # load info from Mission profile
+        mission_waypoints = g_v.mp.mission_waypoints
+        obstacles = g_v.mp.obstacles
+        border = g_v.mp.border
+        lost_comms = g_v.mp.lost_comms
+        search_boundary = g_v.mp.search_boundary
+        off_axis_object = g_v.mp.off_axis_object
+        emergent_object = g_v.mp.emergent_object
+        ugv_boundary = g_v.mp.ugv_boundary
+        airdrop_obj = g_v.mp.airdrop_obj
+        ugv_goal = g_v.mp.ugv_goal
+        mapping_area = g_v.mp.mapping_area
+
+        # object search area
+        surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
+        surf.set_alpha(100)  # alpha level
+        polygon = list(self.dashboard_projection(v) for v in search_boundary.vertices)
+        if len(search_boundary.vertices) > 2:
+            pygame.draw.polygon(surf, (50, 50, 255), polygon, width=0)
+        else:
+            self.draw_edges(search_boundary, color=(75, 75, 255))
+        self.screen.blit(surf, (0, 0))
+        surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
+        surf.set_alpha(150)  # alpha level
+        self.draw_rescaled_points(surf, search_boundary.vertices, self.selection[3], color=(50, 50, 255))
+        self.screen.blit(surf, (0, 0))
+
+        # airdrop boundary area
+        surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
+        surf.set_alpha(100)  # alpha level
+        polygon = list(self.dashboard_projection(v) for v in ugv_boundary.vertices)
+        pygame.draw.polygon(surf, (139, 0, 139), polygon, width=0)
+        self.screen.blit(surf, (0, 0))
+
+        # mapping area
+        surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
+        surf.set_alpha(50)  # alpha level
+        if len(mapping_area.vertices) > 2:
+            polygon = list(self.dashboard_projection(v) for v in mapping_area.vertices)
+        pygame.draw.polygon(surf, (0, 255, 0), polygon, width=0)
+        self.screen.blit(surf, (0, 0))
+
+        # draw the border (edges of border and border vertexes with the ones selected being bigger)
+        self.draw_edges(border, color=(200, 0, 0))
+        self.draw_rescaled_points(self.screen, border.vertices, self.selection[2], color=(200, 0, 0))
+
+        # draw obstacles in white
+        for obstacle_i in obstacles:
+            obstacle_i_dash_xy = self.dashboard_projection(obstacle_i)
+            obstacle_i_dash_r = obstacle_i.r * self.map_scaling
+            pygame.draw.circle(self.screen, (200, 200, 0), obstacle_i_dash_xy, obstacle_i_dash_r)
+
+        # draw the obstacle that is being inputted if there is one
+        if self.inputing == 1 and self.input_type == 1:
+            inputing_radius = g_f.distance_2d(self.input_position, pygame.mouse.get_pos())
+            pygame.draw.circle(self.screen, (200, 200, 0), self.input_position, inputing_radius)
+
+        # draw off-axis object
+        off_obj_pos = self.dashboard_projection(off_axis_object)
+        pygame.draw.circle(self.screen, (0, 0, 0), off_obj_pos, WAYPOINT_SIZE * 2.3, width=4)
+        pygame.draw.circle(self.screen, (255, 255, 255), off_obj_pos, WAYPOINT_SIZE * 2, width=2)
+        pygame.draw.circle(self.screen, (0, 0, 0), off_obj_pos, WAYPOINT_SIZE * 1.8, width=2)
+
+        # airdrop pos
+        airdrop_obj_pos = self.dashboard_projection(airdrop_obj)
+        pygame.draw.circle(self.screen, (0, 0, 0), airdrop_obj_pos, WAYPOINT_SIZE * 2.3)
+        pygame.draw.circle(self.screen, (255, 255, 255), airdrop_obj_pos, WAYPOINT_SIZE * 2, width=2)
+        pygame.draw.circle(self.screen, (255, 255, 255), airdrop_obj_pos, WAYPOINT_SIZE * 1, width=2)
+
+        # emergent obj
+        emergent_object_pos = self.dashboard_projection(emergent_object)
+        pygame.draw.circle(self.screen, (0, 0, 0), emergent_object_pos, WAYPOINT_SIZE * 1.4)
+        pygame.draw.circle(self.screen, (100, 255, 100), emergent_object_pos, WAYPOINT_SIZE * 1)
+
+        # lost_comms
+        lost_comms_pos = self.dashboard_projection(lost_comms)
+        side = WAYPOINT_SIZE * 2.5
+        lost_rect = pygame.Rect(lost_comms_pos[0] - side / 2, lost_comms_pos[1] - side / 2, side, side)
+        pygame.draw.rect(self.screen, (0, 0, 0), lost_rect, width=2)
+        side = WAYPOINT_SIZE * 2
+        lost_rect = pygame.Rect(lost_comms_pos[0] - side / 2, lost_comms_pos[1] - side / 2, side, side)
+        pygame.draw.rect(self.screen, (255, 255, 255), lost_rect, width=2)
+        side = WAYPOINT_SIZE * 1.5
+        lost_rect = pygame.Rect(lost_comms_pos[0] - side / 2, lost_comms_pos[1] - side / 2, side, side)
+        pygame.draw.rect(self.screen, (0, 0, 0), lost_rect, width=2)
+
+        # ugv goal obj
+        ugv_goal_pos = self.dashboard_projection(ugv_goal)
+        pygame.draw.circle(self.screen, (0, 0, 0), ugv_goal_pos, WAYPOINT_SIZE * 1.4)
+        pygame.draw.circle(self.screen, (139, 0, 139), ugv_goal_pos, WAYPOINT_SIZE * 1)
+
+        # draw mission waypoints on top of Final path in black
+        self.draw_rescaled_points(self.screen, mission_waypoints, self.selection[0], (0, 0, 255), 1)
+
+    """draw paths of a certain type depending on the path display mode"""
+    def draw_paths(self):
+
+        straight_2d_paths_list = None
+        curved_2d_paths_list = None
+        curved_3d_paths_list = None
+        chosen_3d_path = None
 
         """straight line paths"""
-        if self.Path_display_mode == 0:
-            Rotator_2 = G_f.RGBRotate()
+        if self.path_display_mode == 0:
+            rotator_2 = g_f.RGBRotate()
             # draw each path in a different color that shifts between mission points
-            # pick path number Path_index from each path group to draw with alternating colors
-            for Group_index, Group_i in enumerate(Straight_2D_paths_list):
-                if self.Selected_path < len(Group_i):
-                    Rotator_2.set_hue_rotation((Group_index / len(Straight_2D_paths_list)) * 360)
-                    Path_to_draw = Group_i[self.Selected_path]
-                    self.Draw_Edges(Path_to_draw, Color=Rotator_2.apply(204, 0, 0))
-                    self.Draw_path_points(Path_to_draw, Rotator_2.apply(204, 0, 0))
+            # pick path number path_index from each path group to draw with alternating colors
+            for group_index, group_i in enumerate(straight_2d_paths_list):
+                if self.selected_path < len(group_i):
+                    rotator_2.set_hue_rotation((group_index / len(straight_2d_paths_list)) * 360)
+                    path_to_draw = group_i[self.selected_path]
+                    self.draw_edges(path_to_draw, color=rotator_2.apply(204, 0, 0))
+                    self.draw_path_points(path_to_draw, rotator_2.apply(204, 0, 0))
 
-            """Draw curved paths"""
-        elif self.Path_display_mode == 1:
+            """draw curved paths"""
+        elif self.path_display_mode == 1:
             # draw path
-            if self.Selected_path < len(Curved_2D_paths_list):
-                Path_to_draw = Curved_2D_paths_list[self.Selected_path]
-                # pick path number Path_index from each path group to draw with alternating colors
-                self.Draw_Edges_alleviated_offset(Path_to_draw, Color=(204, 204, 0))
-                self.Draw_path_points(Path_to_draw, (204, 204, 0))
+            if self.selected_path < len(curved_2d_paths_list):
+                path_to_draw = curved_2d_paths_list[self.selected_path]
+                # pick path number path_index from each path group to draw with alternating colors
+                self.draw_edges_alleviated_offset(path_to_draw, color=(204, 204, 0))
+                self.draw_path_points(path_to_draw, (204, 204, 0))
 
-        elif self.Path_display_mode == 2:
+        elif self.path_display_mode == 2:
             # draw path
-            if self.Selected_path < len(Curved_3D_paths_list):
-                Path_to_draw = Curved_3D_paths_list[self.Selected_path]
-                # pick path number Path_index from each path group to draw with alternating colors
-                self.Draw_Edges_alleviated_offset(Path_to_draw, Color=(204, 204, 0))
-                self.Draw_path_points(Path_to_draw, (204, 204, 0), Altitude=True)
+            if self.selected_path < len(curved_3d_paths_list):
+                path_to_draw = curved_3d_paths_list[self.selected_path]
+                # pick path number path_index from each path group to draw with alternating colors
+                self.draw_edges_alleviated_offset(path_to_draw, color=(204, 204, 0))
+                self.draw_path_points(path_to_draw, (204, 204, 0), altitude=True)
 
-        elif self.Path_display_mode == 3:
+        elif self.path_display_mode == 3:
             # draw chosen path
-            self.Draw_Edges_alleviated_offset(Chosen_3D_path, Color=(204, 204, 0))
-            self.Draw_path_points(Chosen_3D_path, (204, 204, 0), Altitude=True)
+            self.draw_edges_alleviated_offset(chosen_3d_path, color=(204, 204, 0))
+            self.draw_path_points(chosen_3d_path, (204, 204, 0), altitude=True)
 
-    """Draws text near some position"""
-    def Draw_text_off(self, Position, Text):
-        Ratio = (DASHBOARD_SIZE/650)
-        Font_2 = pygame.font.SysFont('Arial', int(10*Ratio))
-        Text_1 = Font_2.render(Text, True, (0, 0, 0))
-        self.screen.blit(Text_1, (Position[0]+10*Ratio, Position[1]-10*Ratio))
+    """draws text near some position"""
+    def draw_text_off(self, position, text):
+        ratio = (DASHBOARD_SIZE / 650)
+        font_2 = pygame.font.Sysfont('Arial', int(10 * ratio))
+        text_1 = font_2.render(text, True, (0, 0, 0))
+        self.screen.blit(text_1, (position[0] + 10 * ratio, position[1] - 10 * ratio))
+
+    def interface_init(self):
+        """Defines dictionaries for the interface"""
+
+        WHITE = (255, 255, 255)
+        BLACK = (0, 0, 0)
+        BLUE = (0, 0, 255)
+        RED = (255, 0, 0)
+        DARK_GREEN = (0, 140, 0)
+        YELLOW = (255, 255, 0)
+        LOW_RED = (200, 0, 0)
+        PURPLE = (148, 0, 211)
+
+        self.font = pygame.font.SysFont('Arial', int(14 * (DASHBOARD_SIZE / 650)))
+
+        # default dictionary of control menu buttons
+        self.buttons = {
+            "Waypoint button": (BLUE, 1.1, 1.0, 2),
+            "Obstacle button": (YELLOW, 1.1, 2.0, 2),
+            "Border button": (LOW_RED, 1.1, 3.0, 2),
+            "Search area button": (BLUE, 1.1, 4.0, 2),
+            "Airdrop button": (PURPLE, 1.1, 5.0, 2),
+            "Airdrop goal button": (PURPLE, 1.1, 6.0, 2),
+            "lost comms button": (WHITE, 1.1, 7.0, 2),
+            "Off axis obj button": (WHITE, 1.1, 8.0, 2),
+            "Emergent obj button": (DARK_GREEN, 1.1, 9.0, 2),
+            "Mapping area button": (DARK_GREEN, 1.1, 10.0, 2),
+            "Reload button": (BLACK, 1.06, 11.0, 2),
+            "Clear button": (BLACK, 1.14, 11.0, 2),
+            "Straight paths button": (RED, 1.02, 12.0, 2),
+            "Curved paths button": (RED, 1.02, 12.5, 2),
+            "3D paths button": (RED, 1.02, 13.0, 2),
+            "Chosen path button": (RED, 1.02, 13.5, 2),
+            "Path <- button": (RED, 1.08, 14.5, 2),
+            "Path -> button": (RED, 1.12, 14.5, 2),
+        }
+
+        # input type of each button
+        self.input_type_dict = {
+            0: "Waypoint button",
+            1: "Obstacle button",
+            2: "Border button",
+            3: "Search area button",
+            4: "Airdrop button",
+            5: "Airdrop goal button",
+            6: "lost comms button",
+            7: "Off axis obj button",
+            8: "Emergent obj button",
+            9: "Mapping area button"
+        }
+
+        # status type of each button
+        self.status_type_dict = {
+            0: "Straight paths button",
+            1: "Curved paths button",
+            2: "3D paths button",
+            3: "Chosen path button"
+        }
+
+        # Text dictionary
+        self.texts = {
+            'Waypoints': (BLUE, 1.1, 0.5),
+            'Obstacles': (YELLOW, 1.1, 1.5),
+            'Border': (LOW_RED, 1.1, 2.5),
+            'Search area': (BLUE, 1.1, 3.5),
+            'Airdrop': (PURPLE, 1.1, 4.5),
+            'Airdrop Goal': (PURPLE, 1.1, 5.5),
+            'Lost comms': (WHITE, 1.1, 6.5),
+            'Off axis object': (WHITE, 1.1, 7.5),
+            'Emergent object': (DARK_GREEN, 1.1, 8.5),
+            'Mapping area': (DARK_GREEN, 1.1, 9.5),
+            'Reload': (BLACK, 1.06, 10.5),
+            'Clear': (BLACK, 1.14, 10.5),
+            'display Mode:': (WHITE, 1.1, 11.5),
+            'straight_paths': (WHITE, 1.11, 12),
+            'curved_paths': (WHITE, 1.11, 12.5),
+            '3d_paths': (WHITE, 1.11, 13.0),
+            'chosen_path': (WHITE, 1.11, 13.5),
+            'selected path:': (WHITE, 1.1, 14.0),
+            '<--             -->': (WHITE, 1.1, 14.5),
+        }
