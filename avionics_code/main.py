@@ -2,6 +2,7 @@ from avionics_code.communications import rf_communications as rf_c, server_commu
 from avionics_code.mission import mission_control as m_c, mission_state as m_s, mission_profile as m_p
 from avionics_code.gui import graphical_user_interface as g_u_i, gui_input_manager as g_i_m
 import avionics_code.helpers.global_variables as g_v
+from avionics_code.flight import flight_profile as f_p
 
 
 def launch_avionics():
@@ -17,11 +18,6 @@ def launch_avionics():
     """Connect to the interop server"""
     g_v.sc.connect()
 
-    """This Mission profile object stores all the mission info
-    provided by the competition's server (border, waypoint,
-    obstacles, etc)."""
-    g_v.mp = g_v.sc.get_mission()
-
     """This RF communications object handles communication with
     the plane's Pixhawk and ground vehicle. It downloads plane
     status information (position, velocity, attitude etc), and
@@ -29,14 +25,23 @@ def launch_avionics():
     to call for the server comms to upload telemetry and the 
     mission controller to refresh the mission state or land
     if telemetry is not received."""
-    #g_v.rf = rf_c.RFComs()
+    g_v.rf = rf_c.RFComs()
 
     """Connect to the Pixhawk"""
-    #g_v.rf.Connect()
+    g_v.rf.connect()
+
+    """This Mission profile object stores all the mission info
+    provided by the competition's server (border, waypoint,
+    obstacles, etc)."""
+    g_v.mp = g_v.sc.get_mission()
+
+    """telemetry history list that keeps track of all the telemetry packages
+    that are received from the pixhawk or plan"""
+    g_v.th = f_p.TelemetryHistory()
 
     """Download once the info of the plane to create an initial
-    flight plan"""
-    #g_v.rf.fetch_plane_status()
+    flight plan and add it to the telemetry history list"""
+    g_v.rf.fetch_plane_status()
 
     """Mission state object storing the waypoints that the plane needs
     to go through in order to accomplish the entire mission (mission

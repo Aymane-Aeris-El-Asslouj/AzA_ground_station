@@ -12,6 +12,9 @@ WAYPOINT_SIZE = 4  # (in pixels) size of waypoints on dashboard
 COLOR_OFFSET_FOR_PATH = 0.5  # (0 to 1 range) Color offset between each two parts of a path for distinguishing them
 DEFAULT_MAP_SIZE = 6000  # (ft) map size * don't change it cause the background doesn't scale with it*
 
+# Communication
+TIME_CUT_OFF_FOR_FLIGHT_STATUS = 10  # (seconds) time after which a flight profile is no longer displayed
+
 # Path finding parameters
 PATHS_PER_WAYPOINTS = 2  # number of paths to find between each two waypoints
 MAX_ATTEMPTS_PER_WAYPOINTS = 100  # max number of rounds of exploration to find paths between two waypoints

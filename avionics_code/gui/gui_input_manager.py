@@ -1,6 +1,7 @@
 from avionics_code.helpers import geometrical_functions as g_f, parameters as para, global_variables as g_v
 import pygame
 import sys
+import time
 
 DASHBOARD_SIZE = para.DASHBOARD_SIZE
 WAYPOINT_SIZE = para.WAYPOINT_SIZE * (DASHBOARD_SIZE / 650)
@@ -47,12 +48,24 @@ def gui_input_manager_start():
                 def action_3():
                     g_v.mp = g_v.sc.get_mission()
 
+                def action_4():
+                    g_v.th.clear()
+                    g_v.rf.fetch_plane_status()
+
+                def action_5():
+                    g_v.th.clear()
+
+                def action_6():
+                    g_v.mp.clear_all()
+
                 # left click actions for buttons
                 left_button_actions = {
                     "Path <- button": action_1,
                     "Path -> button": action_2,
                     "Reload button": action_3,
-                    "Clear button": g_v.mp.clear_all
+                    "Clear button": action_6,
+                    "Reload 2 button": action_4,
+                    "Clear 2 button": action_5
                 }
 
                 # right click actions for buttons
@@ -67,10 +80,13 @@ def gui_input_manager_start():
                     "Off axis obj button": g_v.mp.clear_offaxis_obj,
                     "Emergent obj button": g_v.mp.clear_emergent_obj,
                     "Mapping area button": g_v.mp.clear_mapping_area,
+                    "Plane button": g_v.mp.clear_emergent_obj,
+                    "UGV button": g_v.mp.clear_mapping_area,
                 }
 
                 # Check that cursor in in the control panel
                 if cur_pos[0] > d_s:
+                    g_v.gui.inputing = 0
 
                     # run over all buttons to check if one was click
                     for key in g_v.gui.buttons:
@@ -148,16 +164,19 @@ def gui_input_manager_start():
                                 contact = True
                                 # select object
                                 if pygame.mouse.get_pressed()[0]:
-                                    g_v.gui.selection[delete_type] = i % max(len(map_objects), 1)
+                                    if g_v.gui.input_type == delete_type:
+                                        g_v.gui.selection[delete_type] = i % max(len(map_objects), 1)
+                                        input_done = True
                                     i += 1
-                                    g_v.gui.input_type = delete_type
-                                    input_done = True
                                 # delete object
                                 else:
-                                    delete_func_dict[delete_type](i)
-                                    g_v.gui.selection[delete_type] -= 1
-                                    g_v.gui.selection[delete_type] %= max(len(map_objects), 1)
-                                    compute = True
+                                    if g_v.gui.input_type == delete_type:
+                                        delete_func_dict[delete_type](i)
+                                        g_v.gui.selection[delete_type] -= 1
+                                        g_v.gui.selection[delete_type] %= max(len(map_objects), 1)
+                                        compute = True
+                                    else:
+                                        i += 1
                             else:
                                 i += 1
 
@@ -242,6 +261,27 @@ def gui_input_manager_start():
                                 cursor_on_map = g_v.gui.map_projection(cur_pos)
                                 g_v.mp.set_mapping_area(g_v.gui.input_position, cursor_on_map)
                                 compute = True
+
+                        # change location of emergent object last known position
+                        elif g_v.gui.input_type == 10:
+                            if g_v.gui.inputing == 0:
+                                g_v.gui.inputing = 1
+                                g_v.gui.input_position = g_v.gui.map_projection(cur_pos)
+                            else:
+                                g_v.gui.inputing = 0
+                                cursor_on_map = g_v.gui.map_projection(cur_pos)
+                                g_v.th.add_flight_profile(g_v.gui.input_position, cursor_on_map, time.time())
+                                compute = True
+
+                        # change location of emergent object last known position
+                        elif g_v.gui.input_type == 11:
+                            cursor_on_map = g_v.gui.map_projection(cur_pos)
+                            if g_v.th.is_empty():
+                                ugv_pos = (0, 0)
+                            else:
+                                ugv_pos = g_v.th.last_flight_profile().ugv_obj.pos
+                            g_v.th.add_flight_profile(cursor_on_map, ugv_pos, time.time())
+                            compute = True
 
             # When user releases click, add the input made to map info if it was an obstacle
             if event.type == pygame.MOUSEBUTTONUP:

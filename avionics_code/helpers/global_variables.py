@@ -9,6 +9,9 @@ mp = None
 """RF comms object"""
 rf = None
 
+"""Telemetry history object"""
+th = None
+
 """Mission state object"""
 ms = None
 
