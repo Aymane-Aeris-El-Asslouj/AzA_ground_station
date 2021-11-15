@@ -1,11 +1,12 @@
-import avionics_code.path.path_objects as p_o
+from avionics_code.path import path_objects as p_o
+from avionics_code.helpers import global_variables as g_v
 
 class MissionProfile:
     """stores all mission info received from the server"""
 
     def __init__(self):
         # lost coms (MapObject)
-        self.lost_comms = None
+        self.lost_comms_object = None
 
         # flight area (int + int + border)
         self.border_altitude_min = None
@@ -16,7 +17,7 @@ class MissionProfile:
         self.mission_waypoints = None
 
         # Search grid (MapArea)
-        self.search_boundary = None
+        self.search_area = None
 
         # off axis object (MapObject)
         self.off_axis_object = None
@@ -25,13 +26,13 @@ class MissionProfile:
         self.emergent_object = None
 
         # air drop boundary (MapArea)
-        self.ugv_boundary = None
+        self.ugv_area = None
 
         # air drop position (MapObject)
-        self.airdrop_obj = None
+        self.airdrop_object = None
 
         # ugv driving position (MapObject)
-        self.ugv_goal = None
+        self.ugv_goal_object = None
 
         # obstacles (obstacle list)
         self.obstacles = None
@@ -58,13 +59,13 @@ class MissionProfile:
         del self.border.vertices[i]
 
     def add_search_vertex(self, i, vertex_tuple):
-        self.search_boundary.vertices.insert(i, p_o.Vertex(vertex_tuple))
+        self.search_area.vertices.insert(i, p_o.Vertex(vertex_tuple))
 
     def clear_search(self):
-        self.search_boundary.vertices.clear()
+        self.search_area.vertices.clear()
 
     def delete_search_vertex(self, i):
-        del self.search_boundary.vertices[i]
+        del self.search_area.vertices[i]
 
     def add_waypoint(self, i, waypoint_tuple):
         self.mission_waypoints.insert(i, p_o.Waypoint(waypoint_tuple))
@@ -76,13 +77,13 @@ class MissionProfile:
         del self.mission_waypoints[i]
 
     def set_airdrop(self, pos):
-        self.airdrop_obj.pos = pos
+        self.airdrop_object.pos = pos
 
     def set_airdrop_goal(self, pos):
-        self.ugv_goal.pos = pos
+        self.ugv_goal_object.pos = pos
 
     def set_lostcomms(self, pos):
-        self.lost_comms.pos = pos
+        self.lost_comms_object.pos = pos
 
     def set_offaxis_obj(self, pos):
         self.off_axis_object.pos = pos
@@ -119,14 +120,15 @@ class MissionProfile:
         self.set_mapping_area((0, 0), (0, 0))
 
     def clear_all(self):
-        self.clear_search()
-        self.clear_border()
-        self.clear_waypoints()
-        self.clear_obstacles()
-        self.clear_lostcomms()
-        self.clear_emergent_obj()
-        self.clear_offaxis_obj()
-        self.clear_airdrop()
-        self.clear_airdrop_goal()
-        self.clear_mapping_area()
-
+        self.search_area.vertices.clear()
+        self.border.vertices.clear()
+        self.mission_waypoints.clear()
+        self.obstacles.clear()
+        self.lost_comms_object.pos = (0, 0)
+        self.emergent_object.pos = (0, 0)
+        self.off_axis_object.pos = (0, 0)
+        self.airdrop_object.pos = (0, 0)
+        self.ugv_goal_object.pos = (0, 0)
+        # compute vertices of the area
+        for vertex in self.mapping_area.vertices:
+            vertex.pos = (0, 0)

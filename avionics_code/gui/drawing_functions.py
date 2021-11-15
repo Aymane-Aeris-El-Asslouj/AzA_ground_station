@@ -4,6 +4,7 @@ import math
 
 DASHBOARD_SIZE = para.DASHBOARD_SIZE
 WAYPOINT_SIZE = para.WAYPOINT_SIZE * (DASHBOARD_SIZE / 650)
+ARROW_HEAD_SIZE = para.ARROW_HEAD_SIZE
 
 
 """draw paths of a certain type depending on the path display mode"""
@@ -48,11 +49,12 @@ def draw_paths():
         g_v.gui.draw_path_points(chosen_3d_path, (204, 204, 0), altitude=True)
 
 
-"""draws text near some position"""
-def draw_text_off(position, text):
+def draw_text_off(position, text, color):
+    """draws text near some position"""
+
     ratio = (DASHBOARD_SIZE / 650)
-    font_2 = pygame.font.Sysfont('Arial', int(10 * ratio))
-    text_1 = font_2.render(text, True, (0, 0, 0))
+    font_2 = pygame.font.SysFont('Arial', int(10 * ratio))
+    text_1 = font_2.render(text, True, color)
     g_v.gui.screen.blit(text_1, (position[0] + 10 * ratio, position[1] - 10 * ratio))
 
 
@@ -99,16 +101,6 @@ def draw_path_points(path, color, altitude=False):
             pygame.draw.circle(g_v.gui.screen, (255, 105, 180), vertex_dash_mid, WAYPOINT_SIZE)
             if altitude:
                 pass  # g_v.gui.draw_text_off(vertex_dash_mid, str(int(alleviation_waypoint.z))+" ft")
-
-
-def draw_edges(map_structure, color):
-    """draw edges of map structure"""
-
-    edges_to_draw = map_structure.compute_simple_edges()
-    for edge in edges_to_draw:
-        vertex_1_dash = g_v.gui.dashboard_projection(edge[0])
-        vertex_2_dash = g_v.gui.dashboard_projection(edge[1])
-        pygame.draw.line(g_v.gui.screen, color, vertex_1_dash, vertex_2_dash, width=2)
 
 
 def draw_edges_alleviated_offset(map_structure, color):
@@ -182,11 +174,15 @@ def draw_arrow(surf, object_origin, map_vector, color):
 
     origin = object_origin.pos
 
-    L = 50
-    h = 50
+    L = ARROW_HEAD_SIZE * (800/DASHBOARD_SIZE)
+    h = ARROW_HEAD_SIZE * (800/DASHBOARD_SIZE)
 
     len_v = g_f.norm(map_vector)
     if len_v > 0:
+
+        delta_norm = g_f.norm(map_vector)
+        map_vector = g_f.scale_vector(map_vector, 1 - ARROW_HEAD_SIZE / delta_norm)
+
         unit = g_f.unit_vector(map_vector)
         perp = g_f.rotate_vector(unit, math.pi/2)
 

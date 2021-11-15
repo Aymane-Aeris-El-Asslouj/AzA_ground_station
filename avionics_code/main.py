@@ -8,6 +8,8 @@ from avionics_code.flight import flight_profile as f_p
 def launch_avionics():
     """Launches the Avionics code"""
 
+    print("")
+
     """This Server communications object handles communication with
     the auvsi suas server. It downloads the mission info to make a
     mission profile, then keeps uploading telemetry. In the future,
@@ -49,7 +51,7 @@ def launch_avionics():
     function to generate these true mission waypoints along with
     landing functions in case of timeout or emergency that change
     the plan to landing"""
-    #g_v.ms = m_s.MissionState()
+    g_v.ms = m_s.MissionState()
 
     """Generate complete set of waypoints to accomplish all parts
     of the mission (mission waypoints, UGV drop, map scouting, etc)
@@ -59,7 +61,7 @@ def launch_avionics():
     """Mission control object that handles refreshing of mission state
     based on new plane status info, path recomputation/export and its
     conditions, along with timeout landing"""
-    #g_v.mc = m_c.MissionControl()
+    g_v.mc = m_c.MissionControl()
 
     """Compute selected path object that stores the latest exported trajectory
         waypoint list as a Path object computed from the Mission profile,

@@ -11,12 +11,25 @@ DASHBOARD_SIZE = 650  # default 650 (in pixels) size of dashboard
 WAYPOINT_SIZE = 4  # (in pixels) size of waypoints on dashboard
 COLOR_OFFSET_FOR_PATH = 0.5  # (0 to 1 range) Color offset between each two parts of a path for distinguishing them
 DEFAULT_MAP_SIZE = 6000  # (ft) map size * don't change it cause the background doesn't scale with it*
+ARROW_HEAD_SIZE = 30  # (ft) size of arrow heads
 
 # Communication
 TIME_CUT_OFF_FOR_FLIGHT_STATUS = 10  # (seconds) time after which a flight profile is no longer displayed
 
+# CV/Hardware parameters
+CV_IMAGE_GROUND_SIZE = 200  # (ft) side of the ground square area covered by CV's camera
+OFF_AXIS_IMAGING_DISTANCE = 150  # (ft) distance from border for off-axis imaging
+OFF_AXIS_IMAGING_SEPARATION = 100  # (ft) separation between off-axis imaging waypoints
+OFF_AXIS_IMAGING_RANGE = 200  # (ft) ground range of off-axis imaging
+
+# Mission generation parameters
+WEIGHT_OF_ANGLE = 5000
+BIAS_OF_ANGLE = 0.1
+WEIGHT_OF_DISTANCE = 1
+BIAS_OF_DISTANCE = 1
+
 # Path finding parameters
-PATHS_PER_WAYPOINTS = 2  # number of paths to find between each two waypoints
+PATHS_PER_WAYPOINTS = 1  # number of paths to find between each two waypoints
 MAX_ATTEMPTS_PER_WAYPOINTS = 100  # max number of rounds of exploration to find paths between two waypoints
 VARIATIONS_FOR_PATH_BUILDING = 2  # max number of curved paths to get stitched during curving of straight paths
 

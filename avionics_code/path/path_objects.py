@@ -15,14 +15,14 @@ PREFERRED_TURN_RADIUS = para.PREFERRED_TURN_RADIUS
 
 
 class MapObject:
-    """Parent class for Map objects (waypoints, border vertices, Obstacles)"""
+    """Parent class for Map objects (waypoints, border vertices, obstacles)"""
 
     def __init__(self, position_tuple):
         self.pos = position_tuple
 
 
 class Vertex(MapObject):
-    """Border vertex object with x,y position"""
+    """border vertex object with x,y position"""
 
     pass
 
@@ -42,55 +42,75 @@ class MapArea:
                 edges_list.append((self.vertices[i - 1], self.vertices[i]))
         return edges_list
 
+    def polygon(self):
+        """Returns a polygon of the positions of the vertices"""
+
+        return [vertex.pos for vertex in self.vertices]
+
+    def waypoint_in_area(self, map_object):
+        """checks if MapObject is inside area"""
+
+        if len(self.vertices) > 2:
+            return g_f.point_inside_polygon(map_object.pos, self.polygon())
+        else:
+            return None
+
 
 class Obstacle(MapObject):
-    """Obstacle object with x,y position and radius r"""
+    """obstacle object with x,y position and radius r"""
 
     def __init__(self, position_tuple, r):
         self.r = r
         self.pos = position_tuple
 
-    def create_tangent_nodes(self, Waypoint_1):
-        """Creates tangent nodes from the given waypoint toward the Obstacle to allow dodging it"""
+    def create_tangent_nodes(self, waypoint_1):
+        """Creates tangent nodes from the given waypoint
+        toward the obstacle to allow dodging it"""
 
-        Distance_to_waypoint = g_f.Distance_2d(Waypoint_1.point_2d(), self.point_2d())
-        # Check if Waypoint is the same as center of Obstacle
-        if g_f.float_eq(Distance_to_waypoint, 0):
+        distance_to_waypoint = g_f.distance_2d(waypoint_1.pos, self.pos)
+        # Check if Waypoint is the same as center of obstacle
+        if g_f.float_eq(distance_to_waypoint, 0):
             return None, None
         # Check if Waypoint is far enough for normal node creation
-        elif Distance_to_waypoint >= self.r + 2 * OBSTACLE_DISTANCE_FOR_VALID_NODE:
-
+        elif distance_to_waypoint >= self.r + 2 * OBSTACLE_DISTANCE_FOR_VALID_NODE:
             # safe distance radius
-            Safe_r = self.r + OBSTACLE_DISTANCE_FOR_VALID_NODE
-            N_1, N_2 = g_f.Tangent_points(Waypoint_1.point_2d(), self.point_2d(), Safe_r)
-            return Waypoint(N_1, Parent_Obstacle=self), Waypoint(N_2, Parent_Obstacle=self)
+            safe_r = self.r + OBSTACLE_DISTANCE_FOR_VALID_NODE
+            n_1, n_2 = g_f.tangent_points(waypoint_1.pos, self.pos, safe_r)
+            return Waypoint(n_1, parent_obstacle=self), Waypoint(n_2, parent_obstacle=self)
 
-        # Check if Waypoint is inside Obstacle
-        elif Distance_to_waypoint <= self.r:
+        # Check if Waypoint is inside obstacle
+        elif distance_to_waypoint <= self.r:
             return None, None
-        # Check if Waypoint is in Obstacle orbit for dense node creation
+        # Check if Waypoint is in obstacle orbit for dense node creation
         else:
-            # Find angle of rotation around orbit
-            Factor_1 = self.r + Obstacle_DISTANCE_FOR_VALID_PASS * OBSTACLE_ORBIT_RATIO
-            Factor_2 = self.r + OBSTACLE_DISTANCE_FOR_VALID_NODE
-            Orbit_angle = 2 * math.acos(Factor_1 / Factor_2)
+            # find angle of rotation around orbit
+            factor_1 = self.r + OBSTACLE_DISTANCE_FOR_VALID_PASS * OBSTACLE_ORBIT_RATIO
+            factor_2 = self.r + OBSTACLE_DISTANCE_FOR_VALID_NODE
+            orbit_angle = 2 * math.acos(factor_1 / factor_2)
 
-            # find vector from center of Obstacle to waypoint
-            Axis_vector = g_f.sub_vectors(Waypoint_1.point_2d(), self.point_2d())
+            # find vector from center of obstacle to waypoint
+            axis_vector = g_f.sub_vectors(waypoint_1.pos, self.pos)
 
-            # rotate axis vector around Orbit_angle
-            new_axis_vector_1 = g_f.Rotate_vector(Axis_vector, Orbit_angle)
-            new_axis_vector_2 = g_f.Rotate_vector(Axis_vector, -Orbit_angle)
+            # rotate axis vector around orbit_angle
+            new_axis_1 = g_f.rotate_vector(axis_vector, orbit_angle)
+            new_axis_2 = g_f.rotate_vector(axis_vector, -orbit_angle)
 
-            # add vectors to center of Obstacle location type
-            node_1 = Waypoint(g_f.add_vectors(self.point_2d(), new_axis_vector_1), Parent_Obstacle=self)
-            node_2 = Waypoint(g_f.add_vectors(self.point_2d(), new_axis_vector_2), Parent_Obstacle=self)
+            # add vectors to center of obstacle location type
+            node_1 = Waypoint(g_f.add_vectors(self.pos, new_axis_1), parent_obstacle=self)
+            node_2 = Waypoint(g_f.add_vectors(self.pos, new_axis_2), parent_obstacle=self)
 
             return node_1, node_2
 
 
 class Border(MapArea):
-    """Border object that create waypoints on its concave vertices"""
+    """border object that create waypoints on its concave vertices"""
+    
+    def __init__(self, vertices):
+
+        self.vertices = vertices
+        # list of waypoints on concave border vertices
+        # that allow to dodge the border
+        self.border_waypoints = self.create_vertex_nodes()
 
     def create_vertex_nodes(self):
         """Create vertex nodes on concave border vertices to dodge edges"""
@@ -99,406 +119,476 @@ class Border(MapArea):
         if len(self.vertices) > 2:
             # go through all vertices to see if a node can be created on them
             for vertex_index in range(len(self.vertices)):
-                # Get current, previous and next Border vertices
-                current_vertex = self.vertices[vertex_index % len(self.vertices)]
-                previous_vertex = self.vertices[(vertex_index - 1) % len(self.vertices)]
+                # Get current, previous and next border vertices
+                cur_vertex = self.vertices[vertex_index % len(self.vertices)]
+                prev_vertex = self.vertices[(vertex_index - 1) % len(self.vertices)]
                 next_vertex = self.vertices[(vertex_index + 1) % len(self.vertices)]
 
                 # Get the vectors linking them
-                current_to_previous_vertex = g_f.sub_vectors(previous_vertex.point_2d(), current_vertex.point_2d())
-                current_to_next_vertex = g_f.sub_vectors(next_vertex.point_2d(), current_vertex.point_2d())
+                current_to_previous = g_f.sub_vectors(prev_vertex.pos, cur_vertex.pos)
+                current_to_next = g_f.sub_vectors(next_vertex.pos, cur_vertex.pos)
                 # Check if the vectors are non-nul
-                null_1 = g_f.float_eq_2d(current_to_previous_vertex, (0, 0))
-                null_2 = g_f.float_eq_2d(current_to_next_vertex, (0, 0))
+                null_1 = g_f.float_eq_2d(current_to_previous, (0, 0))
+                null_2 = g_f.float_eq_2d(current_to_next, (0, 0))
                 if not (null_1 or null_2):
 
-                    current_to_previous_vertex = g_f.unit_vector(current_to_previous_vertex)
-                    current_to_next_vertex = g_f.unit_vector(current_to_next_vertex)
+                    current_to_previous = g_f.unit_vector(current_to_previous)
+                    current_to_next = g_f.unit_vector(current_to_next)
 
-                    # Find direction away from border vertex and add a node there
-                    vector_away = g_f.add_vectors(current_to_previous_vertex, current_to_next_vertex)
+                    # find direction away from border vertex and add a node there
+                    vector_away = g_f.add_vectors(current_to_previous, current_to_next)
 
                     # Check if the vectors do not add up to a null vector
                     if not g_f.float_eq_2d(vector_away, (0, 0)):
                         unit_away = g_f.unit_vector(vector_away)
                         offset_away = g_f.scale_vector(unit_away, BORDER_DISTANCE_FOR_VALID_NODE)
-                        new_node = g_f.sub_vectors(current_vertex.point_2d(), offset_away)
-                        node_list.append(Waypoint(new_node, Parent_Vertex=current_vertex))
+                        new_node = g_f.sub_vectors(cur_vertex.pos, offset_away)
+                        node_list.append(Waypoint(new_node, parent_vertex=cur_vertex))
         return node_list
 
+    def waypoint_is_too_close(self, way):
+        """checks waypoint is too close assuming
+        it is inside the border"""
 
-"""z = None for Waypoints created during straight path generation
-Waypoint object with x,y,z position, parent object, and alleviation waypoint
-parent Obstacle: node created on an Obstacle during straight path generation
-Parent Border vertex:  node created on a border vertex during straight path generation
-Alleviation waypoint: waypoint added during path curving to make the turn on the waypoint easier
-Off waypoint: The position that the plane will go to because of inertia after crossing the waypoint"""
+        vertices = self.vertices
+        for vertex_index in range(len(vertices)):
+            vertex_1 = vertices[vertex_index].pos
+            vertex_2 = vertices[(vertex_index + 1) % len(vertices)].pos
+            safe_radius = BORDER_DISTANCE_FOR_VALID_NODE
+            if g_f.seg_to_disk_intersection(vertex_1, vertex_2, way.pos, safe_radius):
+                return True
+
+        return False
+
+
 class Waypoint(MapObject):
-    def __init__(self, position_tuple, z=None, Parent_Obstacle=None, Parent_Vertex=None):
+    """z = None for Waypoints created during straight path generation,
+    
+    Waypoint object with x,y,z position, parent object,
+    and alleviation waypoint
+    
+    parent obstacle: node created on an obstacle during straight
+                path generation
+    Parent border vertex:  node created on a border vertex during
+                straight path generation
+    alleviation waypoint: waypoint added during path curving to
+                make the turn on the waypoint easier
+    off waypoint: The position that the plane will go to
+                because of inertia after crossing the waypoint"""
+    
+    def __init__(self, position_tuple, z=None, parent_obstacle=None, parent_vertex=None):
         self.pos = position_tuple
         self.z = z
-        self.Parent_Obstacle = Parent_Obstacle
-        self.Parent_Vertex = Parent_Vertex
-        self.Alleviation_waypoint = None
-        self.Off_waypoint = None
+        self.parent_obstacle = parent_obstacle
+        self.parent_vertex = parent_vertex
+        self.alleviation_waypoint = None
+        self.off_waypoint = None
+    
+    def distance_2d_to(self, other_way):
+        """computes 2d distance to other Waypoint"""
+        
+        return math.hypot(self.pos[0] - other_way.pos[0], self.pos[1] - other_way.pos[1])
 
-    """computes 2d distance to other Waypoint"""
-    def Distance_2d_to(self, Other_waypoint):
-        return math.hypot(self.x - Other_waypoint.x, self.y - Other_waypoint.y)
+    def distance_3d_to(self, other_way):
+        """computes 2d distance to other Waypoint"""
+    
+        return math.hypot(self.pos[0] - other_way.pos[0], self.pos[1] - other_way.pos[1], self.z - other_way.z)
 
-    """computes 2d distance to other Waypoint"""
-    def Distance_3d_to(self, Other_waypoint):
-        return math.hypot(self.x - Other_waypoint.x, self.y - Other_waypoint.y, self.z - Other_waypoint.z)
+    def is_valid(self, profile_1):
+        """Checks if this waypoint is valid in that it is
+        not inside an obstacles or outside the border"""
 
-    """Checks if this waypoint can be connected to another through
-    a straight line without hitting an Obstacle/border"""
-    def Is_connectable_to(self, Other_waypoint, Mission_profile_1):
+        # check if is is inside some obstacle
+        for obstacle_i in profile_1.obstacles:
+            # check if the seg connecting the two waypoints intersects with the obstacle
+            center = obstacle_i.pos
+            safe_radius = obstacle_i.r + OBSTACLE_DISTANCE_FOR_VALID_NODE
+            if g_f.point_inside_circle(self.pos, center, safe_radius):
+                return False
+
+        # check if point is outside the border
+        inside_border = profile_1.border.waypoint_in_area(self)
+        if not(inside_border or inside_border is None):
+            return False
+
+        # check if point is too close to border
+        if profile_1.border.waypoint_is_too_close(self):
+            return False
+
+        return True
+
+    def is_connectable_to(self, other_way, profile_1):
+        """Checks if this waypoint can be connected to another through
+        a straight line without hitting an obstacle/border"""
 
         # Extract map info
-        Obstacles = Mission_profile_1.Obstacles
-        Border_1 = Mission_profile_1.Border
+        obstacles = profile_1.obstacles
+        border_1 = profile_1.border
 
-        # check if there is a collision with some Obstacle
-        for Obstacle_i in Obstacles:
-            # check if the segment connecting the two waypoints intersects with the Obstacle
-            Center = Obstacle_i.point_2d()
-            Safe_radius = Obstacle_i.r + Obstacle_DISTANCE_FOR_VALID_PASS
-            if g_f.Segment_to_disk_intersection(self.point_2d(), Other_waypoint.point_2d(), Center, Safe_radius):
+        # check if there is a collision with some obstacle
+        for obstacle_i in obstacles:
+            # check if the seg connecting the two waypoints intersects with the obstacle
+            center = obstacle_i.pos
+            safe_radius = obstacle_i.r + OBSTACLE_DISTANCE_FOR_VALID_PASS
+            other_pos = other_way.pos
+            if g_f.seg_to_disk_intersection(self.pos, other_pos, center, safe_radius):
                 return False
 
         # check if there is a collision with some border line
-        for vertex_index in range(len(Border_1.vertices)):
-            Vertex_1 = Border_1.vertices[vertex_index]
-            Vertex_2 = Border_1.vertices[(vertex_index + 1) % len(Border_1.vertices)]
-            # check if the segment connecting the two waypoints intersects with the border line
-            W_node = Other_waypoint.point_2d()
-            V_node_1 = Vertex_1.point_2d()
-            V_node_2 = Vertex_2.point_2d()
-            B_S = BORDER_DISTANCE_FOR_VALID_PASS
-            if g_f.Segment_to_segment_with_safety(self.point_2d(), W_node, V_node_1, V_node_2, B_S):
+        for vertex_index in range(len(border_1.vertices)):
+            vertex_1 = border_1.vertices[vertex_index]
+            vertex_2 = border_1.vertices[(vertex_index + 1) % len(border_1.vertices)]
+            # check if the seg connecting the two waypoints intersects with the border line
+            w_node = other_way.pos
+            v_node_1 = vertex_1.pos
+            v_node_2 = vertex_2.pos
+            b_s = BORDER_DISTANCE_FOR_VALID_PASS
+            if g_f.seg_to_seg_with_safety(self.pos, w_node, v_node_1, v_node_2, b_s):
                 return False
 
         return True
 
-    """Checks if an arc can be constructed from self
-    to Initial_w with center Turn_center_w coming from Base_w"""
-    def Is_arc_connectable_to(self, Base_w, Initial_w, Turn_center_w, Mission_profile_1):
-        node_1 = Base_w.point_2d()
-        node_2 = self.point_2d()
-        node_3 = Initial_w.point_2d()
-        Turn_center = Turn_center_w.point_2d()
-        if g_f.Distinct_points_4(node_1, node_2, node_3, Turn_center):
-            Middle = g_f.Center_2d(node_2, node_3)
-            Distance_to_center = g_f.Distance_2d(self.point_2d(), Turn_center)
-            Middle_1 = g_f.Homothety_unit(Middle, Turn_center, Distance_to_center)
-            Middle_2 = g_f.Homothety_unit(Middle, Turn_center, -Distance_to_center)
+    def is_arc_connectable_to(self, base_w, initial_w, turn_cen_w, profile_1):
+        """Checks if an arc can be constructed from self
+            to initial_w with center turn_cen_w coming from base_w"""
+        
+        node_1 = base_w.pos
+        node_2 = self.pos
+        node_3 = initial_w.pos
+        turn_cen = turn_cen_w.pos
+        if g_f.distinct_points_4(node_1, node_2, node_3, turn_cen):
+            middle = g_f.center_2d(node_2, node_3)
+            distance_to_center = g_f.distance_2d(self.pos, turn_cen)
+            middle_1 = g_f.homothety_unit(middle, turn_cen, distance_to_center)
+            middle_2 = g_f.homothety_unit(middle, turn_cen, -distance_to_center)
+            
+            vec_1 = g_f.sub_vectors(turn_cen, node_2)
+            vec_2 = g_f.sub_vectors(turn_cen, middle_1)
+            a_1 = g_f.find_angle(vec_1, g_f.sub_vectors(node_1, node_2))
+            a_2 = g_f.find_angle(vec_2, g_f.sub_vectors(node_3, middle_1))
 
-            A_1 = g_f.Find_angle(g_f.sub_vectors(Turn_center, node_2), g_f.sub_vectors(node_1, node_2))
-            A_2 = g_f.Find_angle(g_f.sub_vectors(Turn_center, Middle_1), g_f.sub_vectors(node_3, Middle_1))
-
-            # Find which tangent point gives the right orientation for turning
-            if A_1 * A_2 < 0:
-                Arc_middle_w = Waypoint(Middle_1)
+            # find which tangent point gives the right orientation for turning
+            if a_1 * a_2 < 0:
+                arc_middle_w = Waypoint(middle_1)
             else:
-                Arc_middle_w = Waypoint(Middle_2)
+                arc_middle_w = Waypoint(middle_2)
 
-            C_1 = Arc_middle_w.Is_connectable_to(self, Mission_profile_1)
-            C_2 = Arc_middle_w.Is_connectable_to(Initial_w, Mission_profile_1)
-            return C_1 and C_2
+            c_1 = arc_middle_w.is_connectable_to(self, profile_1)
+            c_2 = arc_middle_w.is_connectable_to(initial_w, profile_1)
+            return c_1 and c_2
         else:
             return True
 
-    """Check if waypoint coincides with another waypoint"""
-    def Coincides_with(self, Waypoint_1):
-        return g_f.float_eq_2d(self.point_2d(), Waypoint_1.point_2d())
+    def coincides_with(self, waypoint_1):
+        """Check if waypoint coincides with another waypoint"""
+        
+        return g_f.float_eq_2d(self.pos, waypoint_1.pos)
 
-    """Check if path is going backwards"""
-    def Is_going_backwards(self, Waypoint_1, Waypoint_2):
-        Last_to_current = g_f.sub_vectors(self.point_2d(), Waypoint_1.point_2d())
-        current_to_next = g_f.sub_vectors(Waypoint_2.point_2d(), self.point_2d())
-        if g_f.Distinct_points_3(Last_to_current, current_to_next, (0, 0)):
-            return abs(g_f.Find_angle(Last_to_current, current_to_next)) > math.pi / 2
+    def is_going_backwards(self, waypoint_1, waypoint_2):
+        """Check if path is going backwards"""
+    
+        last_to_current = g_f.sub_vectors(self.pos, waypoint_1.pos)
+        current_to_next = g_f.sub_vectors(waypoint_2.pos, self.pos)
+        if g_f.distinct_points_3(last_to_current, current_to_next, (0, 0)):
+            return abs(g_f.find_angle(last_to_current, current_to_next)) > math.pi / 2
         else:
             return False
 
-    """Check if path through node is not crossing over Obstacle or border (bouncing off it instead)"""
-    def Is_bouncing(self, Waypoint_1, Waypoint_2):
+    def is_bouncing(self, waypoint_1, waypoint_2):
+        """Check if path through node is not crossing
+        over obstacle or border (bouncing off it instead)"""
+    
         # cannot bounce without a node created on a map object
-        if self.Parent_Obstacle is None and self.Parent_Vertex is None:
+        if self.parent_obstacle is None and self.parent_vertex is None:
             return False
         else:
-            if self.Parent_Obstacle is not None:
-                W_node_1 = Waypoint_1.point_2d()
-                W_node_2 = Waypoint_2.point_2d()
-                O_node = self.Parent_Obstacle.point_2d()
-                return not g_f.Is_crossing_over_edge(W_node_1, W_node_2, self.point_2d(), O_node)
-            elif self.Parent_Vertex is not None:
-                W_node_1 = Waypoint_1.point_2d()
-                W_node_2 = Waypoint_2.point_2d()
-                V_node = self.Parent_Vertex.point_2d()
-                return not g_f.Is_crossing_over_edge(W_node_1, W_node_2, self.point_2d(), V_node)
+            if self.parent_obstacle is not None:
+                w_node_1 = waypoint_1.pos
+                w_node_2 = waypoint_2.pos
+                o_node = self.parent_obstacle.pos
+                return not g_f.is_crossing_over_edge(w_node_1, w_node_2, self.pos, o_node)
+            elif self.parent_vertex is not None:
+                w_node_1 = waypoint_1.pos
+                w_node_2 = waypoint_2.pos
+                v_node = self.parent_vertex.pos
+                return not g_f.is_crossing_over_edge(w_node_1, w_node_2, self.pos, v_node)
 
-    """Check if path is going through a node in a straight line"""
-    def Is_across_viable_edge(self, Waypoint_1, Waypoint_2, Mission_profile_1):
+    def is_across_viable_edge(self, waypoint_1, waypoint_2, profile_1):
+        """Check if path is going through a node in a straight line"""
 
-        # Extract map info
-        Obstacle_1 = Mission_profile_1.Obstacles
-        Border_1 = Mission_profile_1.Border
-
-        if Waypoint_2.Is_connectable_to(Waypoint_1, Mission_profile_1):
-            Last_to_current = g_f.sub_vectors(self.point_2d(), Waypoint_1.point_2d())
-            current_to_next = g_f.sub_vectors(Waypoint_2.point_2d(), self.point_2d())
-            if g_f.Distinct_points_3(Last_to_current, current_to_next, (0, 0)):
-                return abs(g_f.Find_angle(Last_to_current, current_to_next)) < MIN_DEVIATION_FOR_ALTERNATIVE_PATH
+        if waypoint_2.is_connectable_to(waypoint_1, profile_1):
+            last_to_current = g_f.sub_vectors(self.pos, waypoint_1.pos)
+            current_to_next = g_f.sub_vectors(waypoint_2.pos, self.pos)
+            if g_f.distinct_points_3(last_to_current, current_to_next, (0, 0)):
+                DIV = MIN_DEVIATION_FOR_ALTERNATIVE_PATH
+                return abs(g_f.find_angle(last_to_current, current_to_next)) < DIV
             else:
                 return False
         else:
             return False
 
-    """adds an alleviation waypoint to make the turn easier"""
-    def Alleviate(self, Waypoint_1, Waypoint_2, Mission_profile_1):
+    def alleviate(self, waypoint_1, waypoint_2, profile_1):
+        """adds an alleviation waypoint to make the turn easier"""
 
-        P_R = PREFERRED_TURN_RADIUS
+        p_r = PREFERRED_TURN_RADIUS
 
-        node_1 = Waypoint_1.point_2d()
-        node_2 = self.point_2d()
-        node_3 = Waypoint_2.point_2d()
-        if not g_f.Distinct_points_3(node_1, node_2, node_3):
+        node_1 = waypoint_1.pos
+        node_2 = self.pos
+        node_3 = waypoint_2.pos
+        if not g_f.distinct_points_3(node_1, node_2, node_3):
             return
 
-        # find two possible turn centers that would allow to turn through node 2 to go into node 3
-        N_1, N_2 = g_f.unit_normal_vectors_to_line(node_2, node_3)
-        Turn_center_1 = g_f.add_vectors(node_2, g_f.scale_vector(N_1, P_R))
-        Turn_center_2 = g_f.add_vectors(node_2, g_f.scale_vector(N_2, P_R))
+        # find two possible turn centers that would allow
+        # to turn through node 2 to go into node 3
+        n_1, n_2 = g_f.unit_normal_vectors_to_line(node_2, node_3)
+        turn_cen_1 = g_f.add_vectors(node_2, g_f.scale_vector(n_1, p_r))
+        turn_cen_2 = g_f.add_vectors(node_2, g_f.scale_vector(n_2, p_r))
 
         # Check which one is on the side of node 1
-        if not g_f.Segment_to_line_intersection(node_1, Turn_center_1, node_2, node_3):
-            Turn_center = Turn_center_1
+        if not g_f.seg_to_line_intersection(node_1, turn_cen_1, node_2, node_3):
+            turn_cen = turn_cen_1
         else:
-            Turn_center = Turn_center_2
+            turn_cen = turn_cen_2
 
-        Alleviation_w = None
+        alleviation_w = None
 
-        A_1 = g_f.Find_angle((0, 1), g_f.sub_vectors(Turn_center, node_2))
-        A_2 = g_f.Find_angle((0, 1), g_f.sub_vectors(node_3, node_2))
-        if -3.14 < A_2 - A_1 < 0 or 3.14 < A_2 - A_1 < 6.30:
-            Rotation_unit = -0.1
+        a_1 = g_f.find_angle((0, 1), g_f.sub_vectors(turn_cen, node_2))
+        a_2 = g_f.find_angle((0, 1), g_f.sub_vectors(node_3, node_2))
+        if -3.14 < a_2 - a_1 < 0 or 3.14 < a_2 - a_1 < 6.30:
+            rotation_unit = -0.1
         else:
-            Rotation_unit = +0.1
+            rotation_unit = +0.1
 
-        new_turn_center = Turn_center
+        new_turn_cen = turn_cen
         # Angle by which the turn center is shifted when the default turn is not possible
-        Turn_offset = 0
+        turn_offset = 0
+        
+        vec_1 = g_f.sub_vectors(node_1, node_2)
+        vec_2 = g_f.sub_vectors(new_turn_cen, node_2)
+        a_x = g_f.find_angle(vec_1, vec_2)
 
-        A_x = g_f.Find_angle(g_f.sub_vectors(node_1, node_2), g_f.sub_vectors(new_turn_center, node_2))
+        while -math.pi/2 < turn_offset < math.pi/2 or -math.pi/2 < a_x < math.pi/2:
 
-        while -math.pi/2 < Turn_offset < math.pi/2 or -math.pi/2 < A_x < math.pi/2:
-
-            A_x = g_f.Find_angle(g_f.sub_vectors(node_1, node_2), g_f.sub_vectors(new_turn_center, node_2))
+            a_x = g_f.find_angle(vec_1, vec_2)
 
             # Make sure node 1 is not inside the turn circle
-            if g_f.Distance_2d(node_1, new_turn_center) > P_R:
+            if g_f.distance_2d(node_1, new_turn_cen) > p_r:
 
-                # Find tangent points on the turn circle coming node_1
-                node_a, node_b = g_f.Tangent_points(node_1, new_turn_center, P_R)
-                A_1 = g_f.Find_angle(g_f.sub_vectors(node_2, new_turn_center), g_f.sub_vectors(node_3, node_2))
-                A_2 = g_f.Find_angle(g_f.sub_vectors(node_a, node_1), g_f.sub_vectors(new_turn_center, node_a))
+                # find tangent points on the turn circle coming node_1
+                node_a, node_b = g_f.tangent_points(node_1, new_turn_cen, p_r)
+                vec_1 = g_f.sub_vectors(node_2, new_turn_cen)
+                vec_2 = g_f.sub_vectors(node_3, node_2)
+                vec_3 = g_f.sub_vectors(node_a, node_1)
+                vec_4 = g_f.sub_vectors(new_turn_cen, node_a)
+                a_1 = g_f.find_angle(vec_1, vec_2)
+                a_2 = g_f.find_angle(vec_3, vec_4)
 
-                # Find which tangent point gives the right orientation for turning
-                if A_1 * A_2 > 0:
-                    Picked_w = Waypoint(node_a)
+                # find which tangent point gives the right orientation for turning
+                if a_1 * a_2 > 0:
+                    picked_w = Waypoint(node_a)
                 else:
-                    Picked_w = Waypoint(node_b)
+                    picked_w = Waypoint(node_b)
 
-                new_center_w = Waypoint(new_turn_center)
+                new_center_w = Waypoint(new_turn_cen)
 
-                if Picked_w.Is_connectable_to(Waypoint_1, Mission_profile_1):
-                    if Picked_w.Is_arc_connectable_to(Waypoint_1, self, new_center_w, Mission_profile_1):
-                        if -math.pi/2 < Turn_offset < math.pi/2:
-                            Alleviation_w = Picked_w
+                if picked_w.is_connectable_to(waypoint_1, profile_1):
+                    if picked_w.is_arc_connectable_to(waypoint_1, self, new_center_w, profile_1):
+                        if -math.pi/2 < turn_offset < math.pi/2:
+                            alleviation_w = picked_w
                             break
 
             # Change the turn center
-            Turn_offset += Rotation_unit
-            new_turn_center = g_f.Rotate_vector_with_center(Turn_center, node_2, Turn_offset)
+            turn_offset += rotation_unit
+            new_turn_cen = g_f.rotate_vector_with_center(turn_cen, node_2, turn_offset)
 
-        if Alleviation_w is None:
-            self.Alleviation_waypoint = Alleviation_w
-        elif g_f.Distance_2d(Alleviation_w.point_2d(), self.point_2d()) > 2*NODE_MIN_DISTANCE:
-            self.Alleviation_waypoint = Alleviation_w
+        if alleviation_w is None:
+            self.alleviation_waypoint = alleviation_w
+        elif g_f.distance_2d(alleviation_w.pos, self.pos) > 2*NODE_MIN_DISTANCE:
+            self.alleviation_waypoint = alleviation_w
         else:
-            self.Alleviation_waypoint = None
+            self.alleviation_waypoint = None
 
         # store turn center as the alleviation waypoint of off waypoint
-        self.Off_waypoint = Waypoint((0, 0))
-        self.Off_waypoint.Alleviation_waypoint = Waypoint(new_turn_center)
+        self.off_waypoint = Waypoint((0, 0))
+        self.off_waypoint.alleviation_waypoint = Waypoint(new_turn_cen)
 
-    """Determines where the off waypoint is"""
-    def Off_shoot(self, previous_waypoint, next_waypoint):
-        P_R = PREFERRED_TURN_RADIUS
-        Center = self.Off_waypoint.Alleviation_waypoint.point_2d()
-        node_1 = previous_waypoint.point_2d()
-        node_2 = self.point_2d()
-        node_3 = next_waypoint.point_2d()
+    def off_shoot(self, prev_waypoint, next_waypoint):
+        """Determines where the off waypoint is"""
 
-        if g_f.Distance_2d(node_3, Center) > P_R:
-            # Find tangent points on the turn circle coming node_1
-            node_a, node_b = g_f.Tangent_points(node_3, Center, P_R)
-            A_1 = g_f.Find_angle(g_f.sub_vectors(Center, node_2), g_f.sub_vectors(node_1, node_2))
-            A_2 = g_f.Find_angle(g_f.sub_vectors(Center, node_a), g_f.sub_vectors(node_3, node_a))
+        p_r = PREFERRED_TURN_RADIUS
+        center = self.off_waypoint.alleviation_waypoint.pos
+        node_1 = prev_waypoint.pos
+        node_2 = self.pos
+        node_3 = next_waypoint.pos
 
-            A_3 = g_f.Find_angle(g_f.sub_vectors(node_1, node_2), g_f.sub_vectors(node_3, node_2))
+        if g_f.distance_2d(node_3, center) > p_r:
+            # find tangent points on the turn circle coming node_1
+            node_a, node_b = g_f.tangent_points(node_3, center, p_r)
+            a_1 = g_f.find_angle(g_f.sub_vectors(center, node_2), g_f.sub_vectors(node_1, node_2))
+            a_2 = g_f.find_angle(g_f.sub_vectors(center, node_a), g_f.sub_vectors(node_3, node_a))
 
-            if abs(A_3) < math.pi / 2 and self.Alleviation_waypoint is not None:
-                # Find which tangent point gives the right orientation for turning
-                if g_f.Distance_2d(node_a, node_2) < g_f.Distance_2d(node_b, node_2):
-                    self.Off_waypoint.x, self.Off_waypoint.y = node_a
+            a_3 = g_f.find_angle(g_f.sub_vectors(node_1, node_2), g_f.sub_vectors(node_3, node_2))
+
+            if abs(a_3) < math.pi / 2 and self.alleviation_waypoint is not None:
+                # find which tangent point gives the right orientation for turning
+                if g_f.distance_2d(node_a, node_2) < g_f.distance_2d(node_b, node_2):
+                    self.off_waypoint.pos[0], self.off_waypoint.pos[1] = node_a
                 else:
-                    self.Off_waypoint.x, self.Off_waypoint.y = node_b
+                    self.off_waypoint.pos[0], self.off_waypoint.pos[1] = node_b
             else:
-                # Find which tangent point gives the right orientation for turning
-                if A_1 * A_2 < 0:
-                    self.Off_waypoint.x, self.Off_waypoint.y = node_a
+                # find which tangent point gives the right orientation for turning
+                if a_1 * a_2 < 0:
+                    self.off_waypoint.pos[0], self.off_waypoint.pos[1] = node_a
                 else:
-                    self.Off_waypoint.x, self.Off_waypoint.y = node_b
+                    self.off_waypoint.pos[0], self.off_waypoint.pos[1] = node_b
         else:
-            self.Off_waypoint.x, self.Off_waypoint.y = None, None
+            self.off_waypoint.pos[0], self.off_waypoint.pos[1] = None, None
 
 
-"""path made from multiple waypoints"""
 class Path:
-    Simple_distance_2d = None
+    """path made from multiple waypoints"""
 
-    def __init__(self, Waypoint_list):
-        self.Waypoint_list = Waypoint_list
+    def __init__(self, waypoint_list):
+        self.waypoint_list = waypoint_list
+        self.simple_distance_2d = None
 
-    """Returns list of edges of the path without alleviation waypoints"""
-    def Compute_simple_edges(self):
+    def compute_simple_edges(self):
+        """Returns list of edges of the path without alleviation waypoints"""
+
         edges_list = list()
-        if len(self.Waypoint_list) > 1:
-            for i in range(len(self.Waypoint_list) - 1):
-                edges_list.append((self.Waypoint_list[i], self.Waypoint_list[i + 1]))
+        if len(self.waypoint_list) > 1:
+            for i in range(len(self.waypoint_list) - 1):
+                edges_list.append((self.waypoint_list[i], self.waypoint_list[i + 1]))
         return edges_list
 
-    """computes 2D distance of the path without considering altitude or alleviation waypoints"""
-    def Compute_simple_distance_2d(self):
-        return sum(Edge[0].Distance_2d_to(Edge[1]) for Edge in self.Compute_simple_edges())
+    def compute_simple_distance_2d(self):
+        """computes 2D distance of the path without
+        considering altitude or alleviation waypoints"""
 
-    """computes 2D distance of the path with alleviation waypoints"""
-    def Compute_true_distance_2d(self):
-        return sum(Edge[0].Distance_2d_to(Edge[1]) for Edge in self.Compute_simple_edges())
+        return sum(edge[0].distance_2d_to(edge[1]) for edge in self.compute_simple_edges())
 
-    """updates 2D distance"""
-    def Distance_2d_update(self):
-        self.Simple_distance_2d = self.Compute_simple_distance_2d()
+    def compute_true_distance_2d(self):
+        """computes 2D distance of the path with alleviation waypoints"""
 
-    """Check if waypoint is part of path"""
-    def Contains_waypoint(self, Waypoint_1):
-        Found = False
-        for Waypoint_i in self.Waypoint_list:
-            if g_f.Distance_2d(Waypoint_i.point_2d(), Waypoint_1.point_2d()) < NODE_MIN_DISTANCE:
-                Found = True
-        return Found
+        return sum(edge[0].distance_2d_to(edge[1]) for edge in self.compute_simple_edges())
 
-    """find total distance of path plus an extra waypoint"""
-    def Path_distance_to_waypoint(self, next_waypoint):
-        Last_node = self.Waypoint_list[len(self.Waypoint_list) - 1]
-        self.Distance_2d_update()
-        return self.Simple_distance_2d + g_f.Distance_2d(Last_node.point_2d(), next_waypoint.point_2d())
+    def distance_2d_update(self):
+        """updates 2D distance"""
 
-    """Curve path by adding alleviation waypoints"""
-    def Curve(self, Mission_profile_1):
+        self.simple_distance_2d = self.compute_simple_distance_2d()
+
+    def contains_waypoint(self, waypoint_1):
+        """Check if waypoint is part of path"""
+
+        found = False
+        for waypoint_i in self.waypoint_list:
+            if g_f.distance_2d(waypoint_i.pos, waypoint_1.pos) < NODE_MIN_DISTANCE:
+                found = True
+        return found
+
+    def path_distance_to_waypoint(self, next_waypoint):
+        """find total distance of path plus an extra waypoint"""
+
+        last_node = self.waypoint_list[len(self.waypoint_list) - 1]
+        self.distance_2d_update()
+        return self.simple_distance_2d + g_f.distance_2d(last_node.pos, next_waypoint.pos)
+
+    def curve(self, profile_1):
+        """Curve path by adding alleviation waypoints"""
 
         """add internal alleviation waypoints inside each path"""
-        if len(self.Waypoint_list) > 2:
-            for Waypoint_index in range(1, len(self.Waypoint_list) - 1):
-                previous_waypoint = self.Waypoint_list[len(self.Waypoint_list) - 1 - Waypoint_index - 1]
-                current_waypoint = self.Waypoint_list[len(self.Waypoint_list) - 1 - Waypoint_index]
-                next_waypoint = self.Waypoint_list[len(self.Waypoint_list) - 1 - Waypoint_index + 1]
-                if next_waypoint.Alleviation_waypoint is not None:
-                    next_waypoint = next_waypoint.Alleviation_waypoint
-                current_waypoint.Alleviate(previous_waypoint, next_waypoint, Mission_profile_1)
+        if len(self.waypoint_list) > 2:
+            for way_index in range(1, len(self.waypoint_list) - 1):
+                prev_waypoint = self.waypoint_list[len(self.waypoint_list) - 1 - way_index - 1]
+                cur_waypoint = self.waypoint_list[len(self.waypoint_list) - 1 - way_index]
+                next_waypoint = self.waypoint_list[len(self.waypoint_list) - 1 - way_index + 1]
+                if next_waypoint.alleviation_waypoint is not None:
+                    next_waypoint = next_waypoint.alleviation_waypoint
+                cur_waypoint.alleviate(prev_waypoint, next_waypoint, profile_1)
 
-    """Finds off waypoints for path"""
-    def Off_shoot(self):
-        if len(self.Waypoint_list) > 2:
-            for Waypoint_index in range(1, len(self.Waypoint_list) - 1):
-                previous_waypoint = self.Waypoint_list[Waypoint_index - 1]
-                current_waypoint = self.Waypoint_list[Waypoint_index]
-                next_waypoint = self.Waypoint_list[Waypoint_index + 1]
-                if current_waypoint.Alleviation_waypoint is not None:
-                    previous_waypoint = current_waypoint.Alleviation_waypoint
-                if next_waypoint.Alleviation_waypoint is not None:
-                    next_waypoint = next_waypoint.Alleviation_waypoint
-                current_waypoint.Off_shoot(previous_waypoint, next_waypoint)
+    def off_shoot(self):
+        """finds off waypoints for path"""
 
-    """Check if path is valid including alleviation waypoints"""
-    def Is_valid(self, Mission_profile_1):
+        if len(self.waypoint_list) > 2:
+            for way_index in range(1, len(self.waypoint_list) - 1):
+                prev_waypoint = self.waypoint_list[way_index - 1]
+                cur_waypoint = self.waypoint_list[way_index]
+                next_waypoint = self.waypoint_list[way_index + 1]
+                if cur_waypoint.alleviation_waypoint is not None:
+                    prev_waypoint = cur_waypoint.alleviation_waypoint
+                if next_waypoint.alleviation_waypoint is not None:
+                    next_waypoint = next_waypoint.alleviation_waypoint
+                cur_waypoint.off_shoot(prev_waypoint, next_waypoint)
 
-        for W_index, Waypoint_i in enumerate(self.Waypoint_list):
-            if 0 < W_index < len(self.Waypoint_list) - 1:
-                C_p = self.Waypoint_list[W_index-1]
-                if C_p.Off_waypoint is not None:
-                    C_p = C_p.Off_waypoint
-                C_w = Waypoint_i
-                if C_w.Alleviation_waypoint is not None:
-                    C_p = C_w.Alleviation_waypoint
-                next_waypoint = self.Waypoint_list[W_index+1]
-                C_off_w = C_w.Off_waypoint
-                C_off_next = next_waypoint.Off_waypoint
-                Al_w = next_waypoint.Alleviation_waypoint
-                if C_off_w is not None:
-                    Turn_center = C_off_w.Alleviation_waypoint
-                    if C_off_w.x is not None:
-                        if not C_w.Is_arc_connectable_to(C_p, C_off_w, Turn_center, Mission_profile_1):
+    def is_valid(self, profile_1):
+        """Check if path is valid including alleviation waypoints"""
+
+        for w_index, waypoint_i in enumerate(self.waypoint_list):
+            if 0 < w_index < len(self.waypoint_list) - 1:
+                c_p = self.waypoint_list[w_index-1]
+                if c_p.off_waypoint is not None:
+                    c_p = c_p.off_waypoint
+                c_w = waypoint_i
+                if c_w.alleviation_waypoint is not None:
+                    c_p = c_w.alleviation_waypoint
+                next_waypoint = self.waypoint_list[w_index+1]
+                c_off_w = c_w.off_waypoint
+                c_off_next = next_waypoint.off_waypoint
+                al_w = next_waypoint.alleviation_waypoint
+                if c_off_w is not None:
+                    turn_cen = c_off_w.alleviation_waypoint
+                    if c_off_w.pos[0] is not None:
+                        if not c_w.is_arc_connectable_to(c_p, c_off_w, turn_cen, profile_1):
                             return False
-                        C_w = C_off_w
+                        c_w = c_off_w
                     else:
-                        Center = g_f.Center_2d(C_w.point_2d(), next_waypoint.point_2d())
-                        Danger_area = Danger_zone(Center, 2*PREFERRED_TURN_RADIUS)
-                        if not Danger_area.Is_free(Mission_profile_1):
+                        center = g_f.center_2d(c_w.pos, next_waypoint.pos)
+                        Danger_area = Danger_zone(center, 2*PREFERRED_TURN_RADIUS)
+                        if not Danger_area.is_free(profile_1):
                             return False
 
-                if Al_w is None:
-                    if not C_w.Is_connectable_to(next_waypoint, Mission_profile_1):
+                if al_w is None:
+                    if not c_w.is_connectable_to(next_waypoint, profile_1):
                         return False
                 else:
-                    Turn_center_2 = C_off_next.Alleviation_waypoint
-                    if not C_w.Is_connectable_to(Al_w, Mission_profile_1):
+                    turn_cen_2 = c_off_next.alleviation_waypoint
+                    if not c_w.is_connectable_to(al_w, profile_1):
                         return False
-                    if not Al_w.Is_arc_connectable_to(C_w, next_waypoint, Turn_center_2, Mission_profile_1):
+                    if not al_w.is_arc_connectable_to(c_w, next_waypoint, turn_cen_2, profile_1):
                         return False
         return True
 
 
-"""Area where the flight is hard to predict"""
 class Danger_zone:
-    def __init__(self, Center, Radius):
-        self.Center = Center
-        self.Radius = Radius
+    """Area where the flight is hard to predict"""
 
-    """Check if the area has no Obstacles or borders in it"""
-    def Is_free(self, Mission_profile_1):
+    def __init__(self, center, radius):
+        self.center = center
+        self.radius = radius
+
+    def is_free(self, profile_1):
+        """Check if the area has no obstacles or borders in it"""
+
         # Extract map info
-        Obstacles = Mission_profile_1.Obstacles
-        Border_1 = Mission_profile_1.Border
+        obstacles = profile_1.obstacles
+        border_1 = profile_1.border
 
-        # check if there is a collision with some Obstacle
-        for Obstacle_i in Obstacles:
+        # check if there is a collision with some obstacle
+        for obstacle_i in obstacles:
 
-            # check if the segment connecting the two waypoints intersects with the Obstacle
-            Center = Obstacle_i.point_2d()
-            if g_f.Circle_to_circle_intersection(self.Center, self.Radius, Center, Obstacle_i.r):
+            # check if the seg connecting the two waypoints intersects with the obstacle
+            center = obstacle_i.pos
+            if g_f.circle_to_circle_intersection(self.center, self.radius, center, obstacle_i.r):
                 return False
 
         # check if there is a collision with some border line
-        for vertex_index in range(len(Border_1.vertices)):
-            Vertex_1 = Border_1.vertices[vertex_index]
-            Vertex_2 = Border_1.vertices[(vertex_index + 1) % len(Border_1.vertices)]
-            # check if the segment connecting the two waypoints intersects with the border line
-            V_node_1 = Vertex_1.point_2d()
-            V_node_2 = Vertex_2.point_2d()
-            if g_f.Segment_to_disk_intersection(V_node_1, V_node_2, self.Center, self.Radius):
+        for vertex_index in range(len(border_1.vertices)):
+            vertex_1 = border_1.vertices[vertex_index]
+            vertex_2 = border_1.vertices[(vertex_index + 1) % len(border_1.vertices)]
+            # check if the seg connecting the two waypoints intersects with the border line
+            v_node_1 = vertex_1.pos
+            v_node_2 = vertex_2.pos
+            if g_f.seg_to_disk_intersection(v_node_1, v_node_2, self.center, self.radius):
                 return False
 
         return True

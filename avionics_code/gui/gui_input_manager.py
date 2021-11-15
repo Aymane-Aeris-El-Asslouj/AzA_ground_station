@@ -33,9 +33,11 @@ def gui_input_manager_start():
                 d_s = DASHBOARD_SIZE
                 dict1 = g_v.gui.input_type_dict
                 dict2 = g_v.gui.status_type_dict
+                dict3 = g_v.gui.mission_state_display_dict
                 # reversed dictionaries to check which buttons has what type or what status
                 input_type_dict_rev = {dict1[key]: key for key in dict1}
                 input_status_dict_rev = {dict2[key]: key for key in dict2}
+                mission_state_display_dict_rev = {dict3[key]: key for key in dict3}
 
                 def action_1():
                     g_v.gui.selected_path += 1
@@ -65,7 +67,8 @@ def gui_input_manager_start():
                     "Reload button": action_3,
                     "Clear button": action_6,
                     "Reload 2 button": action_4,
-                    "Clear 2 button": action_5
+                    "Clear 2 button": action_5,
+                    "Generate button": g_v.ms.generate
                 }
 
                 # right click actions for buttons
@@ -105,6 +108,12 @@ def gui_input_manager_start():
                                     g_v.gui.path_display_mode = input_status_dict_rev[key]
                                     g_v.gui.clamp_display_mode()
                                     input_done = True
+                                # change mission state input type if there is one
+                                if key in mission_state_display_dict_rev.keys():
+                                    index = mission_state_display_dict_rev[key]
+                                    var = g_v.gui.mission_state_display[index]
+                                    g_v.gui.mission_state_display[index] = (var + 1) % 2
+                                    input_done = True
                                 # do a left click actions if the button has one
                                 if key in left_button_actions.keys():
                                     left_button_actions[key]()
@@ -113,8 +122,20 @@ def gui_input_manager_start():
                             elif pygame.mouse.get_pressed()[2]:
                                 # do a right click actions if the button has one
                                 if key in right_button_actions.keys():
-                                    right_button_actions[key]()
-                                    compute = True
+                                    if key in input_type_dict_rev.keys():
+                                        if g_v.gui.is_displayed[input_type_dict_rev[key]] == 1:
+                                            right_button_actions[key]()
+                                            compute = True
+                                    else:
+                                        right_button_actions[key]()
+                                        compute = True
+                            # or middle click
+                            elif pygame.mouse.get_pressed()[1]:
+                                # change input type if the button does that
+                                if key in input_type_dict_rev.keys():
+                                    g_v.gui.is_displayed[input_type_dict_rev[key]] += 1
+                                    g_v.gui.is_displayed[input_type_dict_rev[key]] %= 2
+                                    input_done = True
 
                 # if the user is not interacting with the input menu, then add whatever they want to input
                 # (left click) or delete whatever they are trying to delete (right click)
@@ -129,13 +150,13 @@ def gui_input_manager_start():
                         0: g_v.mp.mission_waypoints,
                         1: g_v.mp.obstacles,
                         2: g_v.mp.border.vertices,
-                        3: g_v.mp.search_boundary.vertices
+                        3: g_v.mp.search_area.vertices
                     }
                     W_S = WAYPOINT_SIZE
                     s = g_v.gui.selection
                     gen1 = range(len(g_v.mp.mission_waypoints))
                     gen2 = range(len(g_v.mp.border.vertices))
-                    gen3 = range(len(g_v.mp.search_boundary.vertices))
+                    gen3 = range(len(g_v.mp.search_area.vertices))
                     map_objects_size_dict = {
                         0: [W_S * (1.5 if (s[0] == i or s[0] == (i - 1) % len(gen1)) else 1) for i in gen1],
                         1: [o.r * g_v.gui.map_scaling for o in g_v.mp.obstacles],
@@ -164,13 +185,13 @@ def gui_input_manager_start():
                                 contact = True
                                 # select object
                                 if pygame.mouse.get_pressed()[0]:
-                                    if g_v.gui.input_type == delete_type:
+                                    if g_v.gui.input_type == delete_type and g_v.gui.is_displayed[delete_type] == 1:
                                         g_v.gui.selection[delete_type] = i % max(len(map_objects), 1)
                                         input_done = True
                                     i += 1
                                 # delete object
                                 else:
-                                    if g_v.gui.input_type == delete_type:
+                                    if g_v.gui.input_type == delete_type and g_v.gui.is_displayed[delete_type] == 1:
                                         delete_func_dict[delete_type](i)
                                         g_v.gui.selection[delete_type] -= 1
                                         g_v.gui.selection[delete_type] %= max(len(map_objects), 1)
@@ -184,7 +205,7 @@ def gui_input_manager_start():
                     if not contact and pygame.mouse.get_pressed()[0]:
 
                         # add waypoint
-                        if g_v.gui.input_type == 0:
+                        if g_v.gui.input_type == 0 and g_v.gui.is_displayed[0] == 1:
                             mission_waypoints = g_v.mp.mission_waypoints
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
                             g_v.mp.add_waypoint(g_v.gui.selection[0] + 1, cursor_on_map)
@@ -195,12 +216,12 @@ def gui_input_manager_start():
                                 g_v.gui.selection[0] = 1
 
                         # start inputing of obstacle
-                        elif g_v.gui.input_type == 1:
+                        elif g_v.gui.input_type == 1 and g_v.gui.is_displayed[1] == 1:
                             g_v.gui.inputing = 1
                             g_v.gui.input_position = cur_pos
 
                         # add border vertex
-                        elif g_v.gui.input_type == 2:
+                        elif g_v.gui.input_type == 2 and g_v.gui.is_displayed[2] == 1:
                             vertices = g_v.mp.border.vertices
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
                             g_v.mp.add_border_vertex(g_v.gui.selection[2] + 1, cursor_on_map)
@@ -211,8 +232,8 @@ def gui_input_manager_start():
                                 g_v.gui.selection[2] = 1
 
                         # add search border vertex
-                        elif g_v.gui.input_type == 3:
-                            vertices = g_v.mp.search_boundary.vertices
+                        elif g_v.gui.input_type == 3 and g_v.gui.is_displayed[3] == 1:
+                            vertices = g_v.mp.search_area.vertices
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
                             g_v.mp.add_search_vertex(g_v.gui.selection[3] + 1, cursor_on_map)
                             g_v.gui.selection[3] += 1
@@ -222,37 +243,37 @@ def gui_input_manager_start():
                                 g_v.gui.selection[3] = 1
 
                         # change location of airdrop position
-                        elif g_v.gui.input_type == 4:
+                        elif g_v.gui.input_type == 4 and g_v.gui.is_displayed[4] == 1:
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
                             g_v.mp.set_airdrop(cursor_on_map)
                             compute = True
 
                         # change location of airdrop goal
-                        elif g_v.gui.input_type == 5:
+                        elif g_v.gui.input_type == 5 and g_v.gui.is_displayed[5] == 1:
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
                             g_v.mp.set_airdrop_goal(cursor_on_map)
                             compute = True
 
                         # change location of lost comms position
-                        elif g_v.gui.input_type == 6:
+                        elif g_v.gui.input_type == 6 and g_v.gui.is_displayed[6] == 1:
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
                             g_v.mp.set_lostcomms(cursor_on_map)
                             compute = True
 
                         # change location of off axis object position
-                        elif g_v.gui.input_type == 7:
+                        elif g_v.gui.input_type == 7 and g_v.gui.is_displayed[7] == 1:
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
                             g_v.mp.set_offaxis_obj(cursor_on_map)
                             compute = True
 
                         # change location of emergent object last known position
-                        elif g_v.gui.input_type == 8:
+                        elif g_v.gui.input_type == 8 and g_v.gui.is_displayed[8] == 1:
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
                             g_v.mp.set_emergent_obj(cursor_on_map)
                             compute = True
 
                         # change map area by inputing the top and bottom point
-                        elif g_v.gui.input_type == 9:
+                        elif g_v.gui.input_type == 9 and g_v.gui.is_displayed[9] == 1:
                             if g_v.gui.inputing == 0:
                                 g_v.gui.inputing = 1
                                 g_v.gui.input_position = g_v.gui.map_projection(cur_pos)
@@ -262,7 +283,7 @@ def gui_input_manager_start():
                                 g_v.mp.set_mapping_area(g_v.gui.input_position, cursor_on_map)
                                 compute = True
 
-                        # change location of emergent object last known position
+                        # change plane and ugv position
                         elif g_v.gui.input_type == 10:
                             if g_v.gui.inputing == 0:
                                 g_v.gui.inputing = 1
@@ -273,7 +294,7 @@ def gui_input_manager_start():
                                 g_v.th.add_flight_profile(g_v.gui.input_position, cursor_on_map, time.time())
                                 compute = True
 
-                        # change location of emergent object last known position
+                        # change ugv position
                         elif g_v.gui.input_type == 11:
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
                             if g_v.th.is_empty():

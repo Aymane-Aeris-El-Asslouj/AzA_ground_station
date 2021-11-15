@@ -16,8 +16,8 @@ def json_to_mission_profile(file):
     g_t_c_c = gg_f.geographic_to_cartesian_center
     g_t_c_l = gg_f.geographic_to_cartesian_list
 
-     # lost coms
-    m_p_var.lost_comms = p_o.MapObject(g_t_c_c(data['lostCommsPos']))
+    # lost coms
+    m_p_var.lost_comms_object = p_o.MapObject(g_t_c_c(data['lostCommsPos']))
 
     # flight area
     m_p_var.border_altitude_min = data['flyZones'][0]['altitudeMin']
@@ -33,7 +33,7 @@ def json_to_mission_profile(file):
 
     # Search grid
     pos_iterator = g_t_c_l(data['searchGridPoints'])
-    m_p_var.search_boundary = p_o.MapArea(list(p_o.Vertex(pos) for pos in pos_iterator))
+    m_p_var.search_area = p_o.MapArea(list(p_o.Vertex(pos) for pos in pos_iterator))
 
     # off axis object
     m_p_var.off_axis_object = p_o.MapObject(g_t_c_c(data['offAxisOdlcPos']))
@@ -43,18 +43,19 @@ def json_to_mission_profile(file):
 
     # air drop boundary
     pos_iterator = g_t_c_l(data['airDropBoundaryPoints'])
-    m_p_var.ugv_boundary = p_o.MapArea(list(p_o.Vertex(pos) for pos in pos_iterator))
+    m_p_var.ugv_area = p_o.MapArea(list(p_o.Vertex(pos) for pos in pos_iterator))
 
     # air drop position
-    m_p_var.airdrop_obj = p_o.MapObject(g_t_c_c(data['airDropPos']))
+    m_p_var.airdrop_object = p_o.MapObject(g_t_c_c(data['airDropPos']))
 
     # ugv driving position
-    m_p_var.ugv_goal = p_o.MapObject(g_t_c_c(data['ugvDrivePos']))
+    m_p_var.ugv_goal_object = p_o.MapObject(g_t_c_c(data['ugvDrivePos']))
 
     # obstacles
     obstacle_points = g_t_c_l(data['stationaryObstacles'])
     obstacle_radii = dictionary_extraction(data['stationaryObstacles'], 'radius')
-    m_p_var.obstacles = list(p_o.Obstacle(o[0], o[1]) for o in zip(obstacle_points, obstacle_radii))
+    zipped = zip(obstacle_points, obstacle_radii)
+    m_p_var.obstacles = list(p_o.Obstacle(o[0], o[1]) for o in zipped)
 
     # map height
     height = data["mapHeight"]

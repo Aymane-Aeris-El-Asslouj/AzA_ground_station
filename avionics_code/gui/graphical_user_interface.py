@@ -28,9 +28,13 @@ class GUI:
         # position in which a current input is being done (probably obstacle input)
         self.input_position = (0, 0)
         # selected map objects
-        self.selection = [0]*9
+        self.selection = [0]*5
+        # displayed map objects
+        self.is_displayed = [1]*12
         # path to show
         self.selected_path = 0
+        # parts of the mission state to show
+        self.mission_state_display = [1]*8
 
         # set the map_scaling to fit it
         self.map_scaling = DASHBOARD_SIZE / DEFAULT_MAP_SIZE
@@ -49,6 +53,7 @@ class GUI:
         self.input_type_dict = None
         self.texts = None
         self.status_type_dict = None
+        self.mission_state_display_dict = None
         self.interface_init()
 
     def display_update(self):
@@ -63,6 +68,9 @@ class GUI:
 
         # draw mission profile info (map)
         self.draw_mission_profile()
+
+        # draw mission state
+        self.draw_mission_state()
 
         # draw flight profile history (plane)
         self.draw_flight_profile()
@@ -90,7 +98,16 @@ class GUI:
                 B = self.buttons[self.input_type_dict[key]]
                 self.buttons[self.input_type_dict[key]] = (B[0], B[1], B[2], 2)
 
-        # change color of selected buttons
+        # change color of mission state buttons
+        for key in self.mission_state_display_dict:
+            if self.mission_state_display[key] == 1:
+                B = self.buttons[self.mission_state_display_dict[key]]
+                self.buttons[self.mission_state_display_dict[key]] = (GREEN, B[1], B[2], B[3])
+            else:
+                B = self.buttons[self.mission_state_display_dict[key]]
+                self.buttons[self.mission_state_display_dict[key]] = (RED, B[1], B[2], B[3])
+
+        # change color of path buttons
         for key in self.status_type_dict:
             if self.path_display_mode == key:
                 B = self.buttons[self.status_type_dict[key]]
@@ -122,95 +139,108 @@ class GUI:
         mission_waypoints = g_v.mp.mission_waypoints
         obstacles = g_v.mp.obstacles
         border = g_v.mp.border
-        lost_comms = g_v.mp.lost_comms
-        search_boundary = g_v.mp.search_boundary
+        lost_comms_object = g_v.mp.lost_comms_object
+        search_area = g_v.mp.search_area
         off_axis_object = g_v.mp.off_axis_object
         emergent_object = g_v.mp.emergent_object
-        ugv_boundary = g_v.mp.ugv_boundary
-        airdrop_obj = g_v.mp.airdrop_obj
-        ugv_goal = g_v.mp.ugv_goal
+        ugv_area = g_v.mp.ugv_area
+        airdrop_object = g_v.mp.airdrop_object
+        ugv_goal_object = g_v.mp.ugv_goal_object
         mapping_area = g_v.mp.mapping_area
 
         # object search area
-        surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
-        surf.set_alpha(100)  # alpha level
-        polygon = list(self.dashboard_projection(v) for v in search_boundary.vertices)
-        if len(search_boundary.vertices) > 2:
-            pygame.draw.polygon(surf, (50, 50, 255), polygon, width=0)
-        else:
-            d_f.draw_edges(search_boundary, color=(75, 75, 255))
-        self.screen.blit(surf, (0, 0))
-        surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
-        surf.set_alpha(150)  # alpha level
-        d_f.draw_rescaled_points(surf, search_boundary.vertices, self.selection[3], color=(50, 50, 255))
-        self.screen.blit(surf, (0, 0))
+        if self.is_displayed[3] == 1:
+            surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
+            surf.set_alpha(100)  # alpha level
+            points = list(self.dashboard_projection(v) for v in search_area.vertices)
+            if len(search_area.vertices) > 2:
+                pygame.draw.polygon(surf, (50, 50, 255), points, width=0)
+            elif len(search_area.vertices) > 1:
+                pygame.draw.aalines(surf, (0, 0, 255), closed=False, points=points)
+
+            self.screen.blit(surf, (0, 0))
+            surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
+            surf.set_alpha(150)  # alpha level
+            d_f.draw_rescaled_points(surf, search_area.vertices, self.selection[3], color=(50, 50, 255))
+            self.screen.blit(surf, (0, 0))
 
         # airdrop boundary area
         surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
         surf.set_alpha(100)  # alpha level
-        polygon = list(self.dashboard_projection(v) for v in ugv_boundary.vertices)
+        polygon = list(self.dashboard_projection(v) for v in ugv_area.vertices)
         pygame.draw.polygon(surf, (139, 0, 139), polygon, width=0)
         self.screen.blit(surf, (0, 0))
 
         # mapping area
-        surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
-        surf.set_alpha(50)  # alpha level
-        if len(mapping_area.vertices) > 2:
-            polygon = list(self.dashboard_projection(v) for v in mapping_area.vertices)
-        pygame.draw.polygon(surf, (0, 255, 0), polygon, width=0)
-        self.screen.blit(surf, (0, 0))
+        if self.is_displayed[9] == 1:
+            surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
+            surf.set_alpha(50)  # alpha level
+            if len(mapping_area.vertices) > 2:
+                polygon = list(self.dashboard_projection(v) for v in mapping_area.vertices)
+                pygame.draw.polygon(surf, (0, 255, 0), polygon, width=0)
+            self.screen.blit(surf, (0, 0))
 
         # draw the border (edges of border and border vertexes with the ones selected being bigger)
-        d_f.draw_edges(border, color=(200, 0, 0))
-        d_f.draw_rescaled_points(self.screen, border.vertices, self.selection[2], color=(200, 0, 0))
+        if self.is_displayed[2] == 1:
+            if len(border.vertices) > 1:
+                points = list(self.dashboard_projection(v) for v in border.vertices)
+                pygame.draw.aalines(self.screen, (200, 0, 0), closed=True, points=points)
+            d_f.draw_rescaled_points(self.screen, border.vertices, self.selection[2], color=(200, 0, 0))
 
-        # draw obstacles in white
-        for obstacle_i in obstacles:
-            obstacle_i_dash_xy = self.dashboard_projection(obstacle_i)
-            obstacle_i_dash_r = obstacle_i.r * self.map_scaling
-            pygame.draw.circle(self.screen, (200, 200, 0), obstacle_i_dash_xy, obstacle_i_dash_r)
+        # draw obstacles in yellow
+        if self.is_displayed[1] == 1:
+            for obstacle_i in obstacles:
+                obstacle_i_dash_xy = self.dashboard_projection(obstacle_i)
+                obstacle_i_dash_r = obstacle_i.r * self.map_scaling
+                pygame.draw.circle(self.screen, (200, 200, 0), obstacle_i_dash_xy, obstacle_i_dash_r)
 
-        # draw the obstacle that is being inputted if there is one
-        if self.inputing == 1 and self.input_type == 1:
-            inputing_radius = g_f.distance_2d(self.input_position, pygame.mouse.get_pos())
-            pygame.draw.circle(self.screen, (200, 200, 0), self.input_position, inputing_radius)
+            # draw the obstacle that is being inputted if there is one
+            if self.inputing == 1 and self.input_type == 1:
+                inputing_radius = g_f.distance_2d(self.input_position, pygame.mouse.get_pos())
+                pygame.draw.circle(self.screen, (200, 200, 0), self.input_position, inputing_radius)
 
-        # draw off-axis object
-        off_obj_pos = self.dashboard_projection(off_axis_object)
-        pygame.draw.circle(self.screen, (0, 0, 0), off_obj_pos, WAYPOINT_SIZE * 2.3, width=4)
-        pygame.draw.circle(self.screen, (255, 255, 255), off_obj_pos, WAYPOINT_SIZE * 2, width=2)
-        pygame.draw.circle(self.screen, (0, 0, 0), off_obj_pos, WAYPOINT_SIZE * 1.8, width=2)
+        # draw off-axis object,
+        if self.is_displayed[7] == 1:
+            off_obj_pos = self.dashboard_projection(off_axis_object)
+            pygame.draw.circle(self.screen, (0, 0, 0), off_obj_pos, WAYPOINT_SIZE * 2.3, width=4)
+            pygame.draw.circle(self.screen, (255, 255, 255), off_obj_pos, WAYPOINT_SIZE * 2, width=2)
+            pygame.draw.circle(self.screen, (0, 0, 0), off_obj_pos, WAYPOINT_SIZE * 1.8, width=2)
 
         # airdrop pos
-        airdrop_obj_pos = self.dashboard_projection(airdrop_obj)
-        pygame.draw.circle(self.screen, (0, 0, 0), airdrop_obj_pos, WAYPOINT_SIZE * 2.3)
-        pygame.draw.circle(self.screen, (255, 255, 255), airdrop_obj_pos, WAYPOINT_SIZE * 2, width=2)
-        pygame.draw.circle(self.screen, (255, 255, 255), airdrop_obj_pos, WAYPOINT_SIZE * 1, width=2)
+        if self.is_displayed[4] == 1:
+            airdrop_object_pos = self.dashboard_projection(airdrop_object)
+            pygame.draw.circle(self.screen, (0, 0, 0), airdrop_object_pos, WAYPOINT_SIZE * 2.3)
+            pygame.draw.circle(self.screen, (255, 255, 255), airdrop_object_pos, WAYPOINT_SIZE * 2, width=2)
+            pygame.draw.circle(self.screen, (255, 255, 255), airdrop_object_pos, WAYPOINT_SIZE * 1, width=2)
 
         # emergent obj
-        emergent_object_pos = self.dashboard_projection(emergent_object)
-        pygame.draw.circle(self.screen, (0, 0, 0), emergent_object_pos, WAYPOINT_SIZE * 1.4)
-        pygame.draw.circle(self.screen, (100, 255, 100), emergent_object_pos, WAYPOINT_SIZE * 1)
+        if self.is_displayed[8] == 1:
+            emergent_object_pos = self.dashboard_projection(emergent_object)
+            pygame.draw.circle(self.screen, (0, 0, 0), emergent_object_pos, WAYPOINT_SIZE * 1.4)
+            pygame.draw.circle(self.screen, (100, 255, 100), emergent_object_pos, WAYPOINT_SIZE * 1)
 
-        # lost_comms
-        lost_comms_pos = self.dashboard_projection(lost_comms)
-        side = WAYPOINT_SIZE * 2.5
-        lost_rect = pygame.Rect(lost_comms_pos[0] - side / 2, lost_comms_pos[1] - side / 2, side, side)
-        pygame.draw.rect(self.screen, (0, 0, 0), lost_rect, width=2)
-        side = WAYPOINT_SIZE * 2
-        lost_rect = pygame.Rect(lost_comms_pos[0] - side / 2, lost_comms_pos[1] - side / 2, side, side)
-        pygame.draw.rect(self.screen, (255, 255, 255), lost_rect, width=2)
-        side = WAYPOINT_SIZE * 1.5
-        lost_rect = pygame.Rect(lost_comms_pos[0] - side / 2, lost_comms_pos[1] - side / 2, side, side)
-        pygame.draw.rect(self.screen, (0, 0, 0), lost_rect, width=2)
+        # lost_comms_object
+        if self.is_displayed[6] == 1:
+            lost_pos = self.dashboard_projection(lost_comms_object)
+            side = WAYPOINT_SIZE * 2.5
+            lost_rect = pygame.Rect(lost_pos[0] - side / 2, lost_pos[1] - side / 2, side, side)
+            pygame.draw.rect(self.screen, (0, 0, 0), lost_rect, width=2)
+            side = WAYPOINT_SIZE * 2
+            lost_rect = pygame.Rect(lost_pos[0] - side / 2, lost_pos[1] - side / 2, side, side)
+            pygame.draw.rect(self.screen, (255, 255, 255), lost_rect, width=2)
+            side = WAYPOINT_SIZE * 1.5
+            lost_rect = pygame.Rect(lost_pos[0] - side / 2, lost_pos[1] - side / 2, side, side)
+            pygame.draw.rect(self.screen, (0, 0, 0), lost_rect, width=2)
 
         # ugv goal obj
-        ugv_goal_pos = self.dashboard_projection(ugv_goal)
-        pygame.draw.circle(self.screen, (0, 0, 0), ugv_goal_pos, WAYPOINT_SIZE * 1.4)
-        pygame.draw.circle(self.screen, (139, 0, 139), ugv_goal_pos, WAYPOINT_SIZE * 1)
+        if self.is_displayed[5] == 1:
+            ugv_goal_object_pos = self.dashboard_projection(ugv_goal_object)
+            pygame.draw.circle(self.screen, (0, 0, 0), ugv_goal_object_pos, WAYPOINT_SIZE * 1.4)
+            pygame.draw.circle(self.screen, (139, 0, 139), ugv_goal_object_pos, WAYPOINT_SIZE * 1)
 
         # draw mission waypoints on top of Final path in black
-        d_f.draw_rescaled_points(self.screen, mission_waypoints, self.selection[0], (0, 0, 255), 1)
+        if self.is_displayed[0] == 1:
+            d_f.draw_rescaled_points(self.screen, mission_waypoints, self.selection[0], (0, 0, 255), 1)
 
     def draw_flight_profile(self):
         """Displays information of the flight profile
@@ -235,23 +265,49 @@ class GUI:
             if len(f_p_list) > index + 1:
 
                 # get velocity vector from current position to next one
-                plane_obj_2 = f_p_list[index + 1].plane_obj
-                time_delta = f_p_list[index + 1].time_int - flight_profile.time_int
-                pos_delta = g_f.sub_vectors(plane_obj_2.pos, plane_obj.pos)
-                velocity_delta = g_f.scale_vector(pos_delta, 1/max(0.0001, time_delta))
-                d_f.draw_arrow(surf, plane_obj, velocity_delta, (255, 255, 255))
-
-                # get velocity vector from current position to next one
                 ugv_obj_2 = f_p_list[index + 1].ugv_obj
                 time_delta = f_p_list[index + 1].time_int - flight_profile.time_int
                 pos_delta = g_f.sub_vectors(ugv_obj_2.pos, ugv_obj.pos)
                 velocity_delta = g_f.scale_vector(pos_delta, 1 / max(0.0001, time_delta))
                 d_f.draw_arrow(surf, ugv_obj, velocity_delta, (0, 0, 0))
 
+                # get velocity vector from current position to next one
+                plane_obj_2 = f_p_list[index + 1].plane_obj
+                time_delta = f_p_list[index + 1].time_int - flight_profile.time_int
+                pos_delta = g_f.sub_vectors(plane_obj_2.pos, plane_obj.pos)
+                velocity_delta = g_f.scale_vector(pos_delta, 1/max(0.0001, time_delta))
+                d_f.draw_arrow(surf, plane_obj, velocity_delta, (255, 255, 255))
+
             # draw plane and ugv positions fading based on time delta
-            pygame.draw.circle(surf, (255, 255, 255), plane_pos, WAYPOINT_SIZE)
             pygame.draw.circle(surf, (0, 0, 0), ugv_pos, WAYPOINT_SIZE)
+            pygame.draw.circle(surf, (255, 255, 255), plane_pos, WAYPOINT_SIZE)
             self.screen.blit(surf, (0, 0))
+
+    def draw_mission_state(self):
+        """Displays information of the mission state:
+        waypoint list"""
+
+        surf = pygame.Surface((DASHBOARD_SIZE * 1.2, DASHBOARD_SIZE), pygame.SRCALPHA)
+        surf.set_alpha(150)  # alpha level
+
+        # draw waypoint list in cyan
+        for index, waypoint in enumerate(g_v.ms.waypoint_list):
+
+            separator_value = min(filter(lambda x: x > index, g_v.ms.separator))
+            separator_index = g_v.ms.separator.index(separator_value)
+            if self.mission_state_display[separator_index] == 1:
+                w_s = WAYPOINT_SIZE * 0.5
+                vertex_dash = self.dashboard_projection(waypoint)
+                pairs = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
+                points = [(vertex_dash[0] + w_s * pair[0], vertex_dash[1] + w_s * pair[1]) for pair in pairs]
+                pygame.draw.polygon(surf, (0, 255, 255), points)
+
+                if index > 0:
+                    pre_waypoint = g_v.ms.waypoint_list[index - 1]
+                    delta_pos = g_f.sub_vectors(waypoint.pos, pre_waypoint.pos)
+                    d_f.draw_arrow(surf, pre_waypoint, delta_pos, (0, 255, 255))
+
+        self.screen.blit(surf, (0, 0))
 
     def interface_init(self):
         """Defines dictionaries for the interface"""
@@ -285,12 +341,21 @@ class GUI:
             "Plane button": (WHITE, 1.1, 13.0, 2),
             "Reload 2 button": (BLACK, 1.05, 14.0, 2),
             "Clear 2 button": (BLACK, 1.15, 14.0, 2),
-            "Straight paths button": (RED, 1.22, 1.0, 2),
-            "Curved paths button": (RED, 1.22, 1.5, 2),
-            "3D paths button": (RED, 1.22, 2.0, 2),
-            "Chosen path button": (RED, 1.22, 2.5, 2),
-            "Path <- button": (RED, 1.28, 3.5, 2),
-            "Path -> button": (RED, 1.32, 3.5, 2),
+            "Generate button": (BLACK, 1.3, 1.0, 2),
+            "waypoint mission button": (RED, 1.22, 2.0, 2),
+            "airdrop mission button": (RED, 1.22, 2.5, 2),
+            "search mission button": (RED, 1.22, 3.0, 2),
+            "mapping mission button": (RED, 1.22, 3.5, 2),
+            "off-axis object mission button": (RED, 1.22, 4.0, 2),
+            "off-axis search mission button": (RED, 1.22, 4.5, 2),
+            "off-axis map mission button": (RED, 1.22, 5.0, 2),
+            "landing mission button": (RED, 1.22, 5.5, 2),
+            "Straight paths button": (RED, 1.22, 8.0, 2),
+            "Curved paths button": (RED, 1.22, 8.5, 2),
+            "3D paths button": (RED, 1.22, 9.0, 2),
+            "Chosen path button": (RED, 1.22, 9.5, 2),
+            "Path <- button": (RED, 1.28, 10.5, 2),
+            "Path -> button": (RED, 1.32, 10.5, 2),
         }
 
         # input type of each button
@@ -317,6 +382,18 @@ class GUI:
             3: "Chosen path button"
         }
 
+        # status type of each button
+        self.mission_state_display_dict = {
+            0: "waypoint mission button",
+            1: "airdrop mission button",
+            2: "search mission button",
+            3: "mapping mission button",
+            4: "off-axis object mission button",
+            5: "off-axis search mission button",
+            6: "off-axis map mission button",
+            7: "landing mission button"
+        }
+
         # Text dictionary
         self.texts = {
             'Waypoints': (BLUE, 1.1, 0.5),
@@ -335,13 +412,23 @@ class GUI:
             'Plane position': (WHITE, 1.1, 12.5),
             'Reload 2': (BLACK, 1.05, 13.5),
             'Clear 2': (BLACK, 1.15, 13.5),
-            'display Mode:': (WHITE, 1.3, 0.5),
-            'straight_paths': (WHITE, 1.31, 1),
-            'curved_paths': (WHITE, 1.31, 1.5),
-            '3d_paths': (WHITE, 1.31, 2.0),
-            'chosen_path': (WHITE, 1.31, 2.5),
-            'selected path:': (WHITE, 1.3, 3.0),
-            '<--             -->': (WHITE, 1.3, 3.5),
+            'Generate mission': (BLACK, 1.3, 0.5),
+            'mission plan:': (WHITE, 1.31, 1.5),
+            'waypoints': (WHITE, 1.31, 2.0),
+            'airdrop': (WHITE, 1.31, 2.5),
+            'search': (WHITE, 1.31, 3.0),
+            'mapping': (WHITE, 1.31, 3.5),
+            'off-axis object': (WHITE, 1.31, 4.0),
+            'off-axis search': (WHITE, 1.31, 4.5),
+            'off-axis map': (WHITE, 1.31, 5.0),
+            'landing': (WHITE, 1.31, 5.5),
+            'display Mode:': (WHITE, 1.3, 7.5),
+            'straight_paths': (WHITE, 1.31, 8),
+            'curved_paths': (WHITE, 1.31, 8.5),
+            '3d_paths': (WHITE, 1.31, 9.0),
+            'chosen_path': (WHITE, 1.31, 9.5),
+            'selected path:': (WHITE, 1.3, 10.0),
+            '<--             -->': (WHITE, 1.3, 10.5),
         }
 
     def dashboard_projection(self, map_object):
