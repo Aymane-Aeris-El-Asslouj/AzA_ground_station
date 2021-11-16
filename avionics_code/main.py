@@ -4,7 +4,6 @@ from avionics_code.gui import graphical_user_interface as g_u_i, gui_input_manag
 import avionics_code.helpers.global_variables as g_v
 from avionics_code.flight import flight_profile as f_p
 
-
 def launch_avionics():
     """Launches the Avionics code"""
 
@@ -56,7 +55,7 @@ def launch_avionics():
     """Generate complete set of waypoints to accomplish all parts
     of the mission (mission waypoints, UGV drop, map scouting, etc)
     based on the mission profile and the current status of the plane"""
-    #g_v.ms.generate()
+    g_v.ms.generate()
 
     """Mission control object that handles refreshing of mission state
     based on new plane status info, path recomputation/export and its
@@ -67,7 +66,7 @@ def launch_avionics():
         waypoint list as a Path object computed from the Mission profile,
         Mission State, and current plane status info. Also calls RF comms
         to convert the path into flight plan and export it to the Pixhawk"""
-    #g_v.mc.computepath()
+    g_v.mc.compute_path()
 
     """Starts the loop of RF comms that keeps fetching for plane
     status info and calling server comms' telemetry upload and

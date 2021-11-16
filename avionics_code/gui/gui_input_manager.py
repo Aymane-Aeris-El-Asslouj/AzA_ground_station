@@ -40,11 +40,11 @@ def gui_input_manager_start():
                 mission_state_display_dict_rev = {dict3[key]: key for key in dict3}
 
                 def action_1():
-                    g_v.gui.selected_path += 1
+                    g_v.gui.selected_path -= 1
                     g_v.gui.clamp_display_mode()
 
                 def action_2():
-                    g_v.gui.selected_path -= 1
+                    g_v.gui.selected_path += 1
                     g_v.gui.clamp_display_mode()
 
                 def action_3():
@@ -60,6 +60,14 @@ def gui_input_manager_start():
                 def action_6():
                     g_v.mp.clear_all()
 
+                def action_7():
+                    g_v.ms.generate()
+                    g_v.mc.compute_path()
+
+                def action_8():
+                    g_v.ms.land()
+                    g_v.mc.compute_path()
+
                 # left click actions for buttons
                 left_button_actions = {
                     "Path <- button": action_1,
@@ -68,7 +76,10 @@ def gui_input_manager_start():
                     "Clear button": action_6,
                     "Reload 2 button": action_4,
                     "Clear 2 button": action_5,
-                    "Generate button": g_v.ms.generate
+                    "Generate button": action_7,
+                    "land button": action_8,
+                    "ending mission button": g_v.rf.end_mission,
+                    "drop authorization button": g_v.rf.authorize_airdrop
                 }
 
                 # right click actions for buttons
@@ -208,7 +219,7 @@ def gui_input_manager_start():
                         if g_v.gui.input_type == 0 and g_v.gui.is_displayed[0] == 1:
                             mission_waypoints = g_v.mp.mission_waypoints
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
-                            g_v.mp.add_waypoint(g_v.gui.selection[0] + 1, cursor_on_map)
+                            g_v.mp.add_waypoint(g_v.gui.selection[0] + 1, cursor_on_map, g_v.gui.altitude_box)
                             g_v.gui.selection[0] += 1
                             g_v.gui.selection[0] %= max(1, len(mission_waypoints))
                             compute = True
@@ -288,20 +299,27 @@ def gui_input_manager_start():
                             if g_v.gui.inputing == 0:
                                 g_v.gui.inputing = 1
                                 g_v.gui.input_position = g_v.gui.map_projection(cur_pos)
+                                g_v.gui.input_altitude = g_v.gui.altitude_box
                             else:
                                 g_v.gui.inputing = 0
-                                cursor_on_map = g_v.gui.map_projection(cur_pos)
-                                g_v.th.add_flight_profile(g_v.gui.input_position, cursor_on_map, time.time())
+                                plane_pos = g_v.gui.input_position
+                                plane_z = g_v.gui.input_altitude
+                                ugv_pos = g_v.gui.map_projection(cur_pos)
+                                ugv_z = g_v.gui.altitude_box
+                                g_v.th.add_flight_profile(plane_pos, plane_z, ugv_pos, ugv_z, time.time())
                                 compute = True
 
                         # change ugv position
                         elif g_v.gui.input_type == 11:
                             cursor_on_map = g_v.gui.map_projection(cur_pos)
+                            plane_z = g_v.gui.altitude_box
                             if g_v.th.is_empty():
                                 ugv_pos = (0, 0)
+                                ugv_z = 0
                             else:
                                 ugv_pos = g_v.th.last_flight_profile().ugv_obj.pos
-                            g_v.th.add_flight_profile(cursor_on_map, ugv_pos, time.time())
+                                ugv_z = g_v.th.last_flight_profile().ugv_obj.z
+                            g_v.th.add_flight_profile(cursor_on_map, plane_z, ugv_pos, ugv_z, time.time())
                             compute = True
 
             # When user releases click, add the input made to map info if it was an obstacle
@@ -319,6 +337,16 @@ def gui_input_manager_start():
                         g_v.mp.add_obstacle((proj(g_v.gui.input_position), Dis))
                     compute = True
 
+            # When user types altitude
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE:
+                    g_v.gui.altitude_box = float(int(g_v.gui.altitude_box/10))
+                    input_done = True
+                else:
+                    if event.unicode.isdigit():
+                        g_v.gui.altitude_box = 10 * g_v.gui.altitude_box + int(event.unicode)
+                        input_done = True
+
             # Close dashboard if prompted to, and quit the program
             if event.type == pygame.QUIT:
                 pygame.quit()
@@ -330,6 +358,6 @@ def gui_input_manager_start():
             g_v.gui.display_update()
 
         # if some interface input was made that changed the path, update the display
-        if (g_v.gui.inputing == 1) or (input_done and (not compute)):
+        if (g_v.gui.inputing == 1 and g_v.gui.input_type == 1) or (input_done and (not compute)):
             g_v.gui.display_update()
         pygame.display.update()

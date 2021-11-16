@@ -8,6 +8,7 @@ def distribution_increment(distribution, variation_num):
         distribution.clear()
         return
     while sum(distribution) != variation_num:
+        print(distribution)
         if binary_increment(distribution) == 1:
             distribution.clear()
             break

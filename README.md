@@ -4,18 +4,20 @@ Code of the Avionics team at the Arizona Autonomous Vehicles Club
 Python code that handles server communications and autonomous flying of the club's plane  
   
 Status:  
-> • Server communications - Not handled  
-> • Decision making - Not handled  
+> • Server/RF communications - hollow classes  
+> • Decision making - hollow classes  
 > • Pathfinding - Only 2d straight line pathfinding  
 
 GUI instructions:  
-> • Click on the dots in the selection menu up-left to go into mission_waypoint(blue)/obstacle(white)/border(yellow) input mode  
-> • For waypoints and border vertices, click once to place them. Click on a waypoint/border_vertex to select it for placing a waypoint/border_vertex after it  
-> • For Obstacles, click at where you want the obstacle to be, then drag to select the radius  
-> • To delete any object (waypoint/obstacle/border_vertex), right click on it  
-> • To delete all objects of a certain type, right click on the dot in the selection menu that corresponds to it  
-> • The current algorithm will show two possible paths for each two waypoints in different colors. That color itself alternates for the same path between waypoints  
-> • If no path can be found, you will get a message in the console "Error: no path found"  
+> • Click on the buttons in the left-side menu to go into input-mode for a certain map object type  
+> • While in an input mode, you can left-click to place an object or right-click to delete it    
+> • altitude for inputs is to be written in the textbox before left-click
+> • For area or path objects, you can select a vertex/waypoint to place a vertex/waypoint next to it  
+> • For obstacles, hold click to select radius. For map, click twice to set the top and bottom of the area  
+> • Right-click on a circle to delete all instances of a map object or reset them to map center  
+> • Clear buttons can clear all map objects or clear all past plane telemetry history  
+> • Reload buttons can reload mission profile or fetch plane telemetry  
+> • Plane/ugv positions can be inputted using their buttons  
+> • the generate button generates a mission plan based on the mission profile, then exports a path for it
 
 ![Diagrams/AzA_Avionics_diagram.jpg](doc/AzA_Avionics_diagram.jpg)
-![Diagrams/Path_finder_diagram.jpg](doc/Path_finder_diagram.jpg)

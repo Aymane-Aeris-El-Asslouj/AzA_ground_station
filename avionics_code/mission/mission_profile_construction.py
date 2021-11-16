@@ -29,7 +29,7 @@ def json_to_mission_profile(file):
     mission_xy_tuples = g_t_c_l(data['waypoints'])
     altitude_tuples = list(w_i["altitude"] for w_i in data['waypoints'])
     waypoint_tuples = list(zip(mission_xy_tuples, altitude_tuples))
-    m_p_var.mission_waypoints = list(p_o.Waypoint(t[0], t[1]) for t in waypoint_tuples)
+    m_p_var.mission_waypoints = list(p_o.Waypoint(0, t[0], t[1], is_mission=True) for t in waypoint_tuples)
 
     # Search grid
     pos_iterator = g_t_c_l(data['searchGridPoints'])

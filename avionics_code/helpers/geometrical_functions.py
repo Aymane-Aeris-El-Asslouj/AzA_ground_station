@@ -89,8 +89,11 @@ def rotate_vector_with_center(vector, center, angle):
 
 def homothety_unit(vector, center, factor):
     """pushes some vector away so it is distance factor away"""
-    
-    return add_vectors(center, scale_vector(unit_vector(sub_vectors(vector, center)), factor))
+
+    if distinct_points_2(vector, center):
+        return add_vectors(center, scale_vector(unit_vector(sub_vectors(vector, center)), factor))
+    else:
+        return None
 
 
 def vector_average(vector_list):
@@ -216,6 +219,9 @@ def seg_to_disk_intersection(point_1, point_2, circle_cen, circle_rad):
     if float_eq_2d(point_1, point_2):
         return distance_2d(point_1, circle_cen) < circle_rad
     else:
+        # check if the line intersects the disk
+        if not line_to_circle_intersection(point_1, point_2, circle_cen, circle_rad):
+            return False
         # check if circle center is inside pill area around seg of radius circle radius
         # move reference point to point_1
         point_2_new = sub_vectors(point_2, point_1)
@@ -346,12 +352,16 @@ def seg_to_seg_with_safety(point_1, point_2, point_3, point_4, safety_distance):
     area close to it by some safety distance"""
     
     s_d = safety_distance
-    
     # check if points are not intersecting two larger zones around the seg 2
     middle = center_2d(point_3, point_4)
     quarter_seg = distance_2d(point_3, point_4) / 4
     quarter_1 = center_2d(middle, point_3)
     quarter_2 = center_2d(middle, point_4)
+
+    dis = distance_2d(point_3, point_4) / 2 + s_d
+    if not seg_to_disk_intersection(point_1, point_2, middle, dis):
+        return False
+
     dis = quarter_seg + s_d
     if not seg_to_disk_intersection(point_1, point_2, quarter_1, dis):
         if not seg_to_disk_intersection(point_1, point_2, quarter_2, dis):

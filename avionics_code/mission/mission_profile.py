@@ -67,8 +67,8 @@ class MissionProfile:
     def delete_search_vertex(self, i):
         del self.search_area.vertices[i]
 
-    def add_waypoint(self, i, waypoint_tuple):
-        self.mission_waypoints.insert(i, p_o.Waypoint(waypoint_tuple))
+    def add_waypoint(self, i, waypoint_tuple, altitude):
+        self.mission_waypoints.insert(i, p_o.Waypoint(0, waypoint_tuple, altitude, is_mission=True))
 
     def clear_waypoints(self):
         self.mission_waypoints.clear()

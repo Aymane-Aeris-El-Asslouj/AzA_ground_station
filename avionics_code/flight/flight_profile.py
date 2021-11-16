@@ -9,12 +9,12 @@ class TelemetryHistory:
     def __init__(self):
         self.flight_profile_list = list()
 
-    def add_flight_profile(self, plane_pos, ugv_pos, time_int):
+    def add_flight_profile(self, plane_pos, plane_z, ugv_pos, ugv_z, time_int):
         """add a flight profile from profile info"""
 
         fp = FlightProfile()
-        fp.plane_obj = FlightObject(plane_pos)
-        fp.ugv_obj = FlightObject(ugv_pos)
+        fp.plane_obj = FlightObject(plane_pos, plane_z)
+        fp.ugv_obj = FlightObject(ugv_pos, ugv_z)
         fp.time_int = time_int
         self.flight_profile_list.append(fp)
 
@@ -24,7 +24,10 @@ class TelemetryHistory:
     def last_flight_profile(self):
         """returns last flight profile added to list"""
 
-        return self.flight_profile_list[len(self.flight_profile_list)-1]
+        if len(self.flight_profile_list) > 0:
+            return self.flight_profile_list[-1]
+        else:
+            return None
 
     def is_empty(self):
         """checks if flight profile list is empty"""
@@ -61,5 +64,6 @@ class FlightProfile:
 class FlightObject:
     """Parent class for Flight objects"""
 
-    def __init__(self, position_tuple):
+    def __init__(self, position_tuple, z):
         self.pos = position_tuple
+        self.z = z
