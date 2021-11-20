@@ -8,22 +8,22 @@ BIAS_OF_DISTANCE = para.BIAS_OF_DISTANCE
 OFF_AXIS_WEIGHT_OF_ANGLE = para.OFF_AXIS_WEIGHT_OF_ANGLE
 
 
-def cover(cell_array, plane_pos, profile, off_axis=False):
-    """Finds a path that covers all positions on a map"""
+def cover(waypoint_array, plane_pos, profile, off_axis=False):
+    """Finds a path that covers all waypoints in list on a map"""
 
     path = list()
-
-    if len(cell_array) == 0:
+    cell_array = [way.pos for way in waypoint_array]
+    if len(waypoint_array) == 0:
         return path
 
     # start with an edge
     if plane_pos is not None:
         last_pos_2 = plane_pos
         edge_cells = list()
-        min_x = min(cell[0] for cell in cell_array)
-        max_x = max(cell[0] for cell in cell_array)
-        min_y = min(cell[1] for cell in cell_array)
-        max_y = max(cell[1] for cell in cell_array)
+        min_x = min(cell.pos[0] for cell in waypoint_array)
+        max_x = max(cell.pos[0] for cell in waypoint_array)
+        min_y = min(cell.pos[1] for cell in waypoint_array)
+        max_y = max(cell.pos[1] for cell in waypoint_array)
 
         def check_edge(x):
             f_q = g_f.float_eq
@@ -37,16 +37,16 @@ def cover(cell_array, plane_pos, profile, off_axis=False):
         last_pos_2 = last_pos
 
     # add closest cell to list of cells to travel then delete it from array
-    for index in range(len(cell_array)):
-        next_cell = min(cell_array, key=lambda x: cell_cost(last_pos_2, last_pos, x, profile, off_axis))
+    for index in range(len(waypoint_array)):
+        next_cell = min(waypoint_array, key=lambda x: cell_cost(last_pos_2, last_pos, x.pos, off_axis))
         path.append(next_cell)
-        del cell_array[cell_array.index(next_cell)]
+        del waypoint_array[waypoint_array.index(next_cell)]
         last_pos_2 = last_pos
-        last_pos = next_cell
+        last_pos = next_cell.pos
 
     return path
 
-def cell_cost(cell_0, cell_1, cell_2, profile, off_axis):
+def cell_cost(cell_0, cell_1, cell_2, off_axis):
     """Finds the 'cost' of going into a cell
     considering the two previous cells"""
 

@@ -10,7 +10,6 @@ BORDER_DISTANCE_FOR_VALID_NODE = para.BORDER_DISTANCE_FOR_VALID_NODE
 NODE_MIN_DISTANCE = para.NODE_MIN_DISTANCE
 OBSTACLE_ORBIT_RATIO = para.OBSTACLE_ORBIT_RATIO
 MIN_DEVIATION_FOR_ALTERNATIVE_PATH = math.radians(para.MIN_DEVIATION_FOR_ALTERNATIVE_PATH)
-TURN_RADIUS = para.TURN_RADIUS
 PREFERRED_TURN_RADIUS = para.PREFERRED_TURN_RADIUS
 
 
@@ -178,10 +177,11 @@ class Waypoint(MapObject):
                 because of inertia after crossing the waypoint
     mission index: index for what part of the mission they are
     is mission: is part of the mission state, so it was not added
-                for another purpose"""
+                for another purpose
+    target: target for action, likely off axis imaging"""
     
     def __init__(self, mission_index, position_tuple, z=None,
-                 parent_obstacle=None, parent_vertex=None, is_mission=False):
+                 parent_obstacle=None, parent_vertex=None, is_mission=False, target=None):
         super().__init__(position_tuple)
         self.mission_index = mission_index
         self.z = z
@@ -190,6 +190,7 @@ class Waypoint(MapObject):
         self.alleviation_waypoint = None
         self.off_waypoint = None
         self.is_mission = is_mission
+        self.target = target
     
     def distance_2d_to(self, other_way):
         """computes 2d distance to other Waypoint"""
@@ -487,15 +488,6 @@ class Path:
         """updates 2D distance"""
 
         self.simple_distance_2d = self.compute_simple_distance_2d()
-
-    def contains_waypoint(self, waypoint_1):
-        """Check if waypoint is part of path"""
-
-        found = False
-        for waypoint_i in self.waypoint_list:
-            if g_f.float_eq_2d(waypoint_i.pos, waypoint_1.pos):
-                found = True
-        return found
 
     def path_distance_to_waypoint(self, next_waypoint):
         """find total distance of path plus an extra waypoint"""

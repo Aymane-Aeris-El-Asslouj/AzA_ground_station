@@ -4,10 +4,12 @@ from avionics_code.gui import graphical_user_interface as g_u_i, gui_input_manag
 import avionics_code.helpers.global_variables as g_v
 from avionics_code.flight import flight_profile as f_p
 
+import time
+
 def launch_avionics():
     """Launches the Avionics code"""
 
-    print("")
+    g_v.init_time = time.time()
 
     """This Server communications object handles communication with
     the auvsi suas server. It downloads the mission info to make a
@@ -36,14 +38,6 @@ def launch_avionics():
     obstacles, etc)."""
     g_v.mp = g_v.sc.get_mission()
 
-    """telemetry history list that keeps track of all the telemetry packages
-    that are received from the pixhawk or plan"""
-    g_v.th = f_p.TelemetryHistory()
-
-    """Download once the info of the plane to create an initial
-    flight plan and add it to the telemetry history list"""
-    g_v.rf.fetch_plane_status()
-
     """Mission state object storing the waypoints that the plane needs
     to go through in order to accomplish the entire mission (mission
     waypoints, UGV drop, scouting for pictures, etc). Has a generation
@@ -57,16 +51,18 @@ def launch_avionics():
     based on the mission profile and the current status of the plane"""
     g_v.ms.generate()
 
+    """telemetry history list that keeps track of all the telemetry packages
+    that are received from the pixhawk or plan"""
+    g_v.th = f_p.TelemetryHistory()
+
     """Mission control object that handles refreshing of mission state
     based on new plane status info, path recomputation/export and its
     conditions, along with timeout landing"""
     g_v.mc = m_c.MissionControl()
 
-    """Compute selected path object that stores the latest exported trajectory
-        waypoint list as a Path object computed from the Mission profile,
-        Mission State, and current plane status info. Also calls RF comms
-        to convert the path into flight plan and export it to the Pixhawk"""
-    g_v.mc.compute_path()
+    """Download once the info of the plane to create an initial
+    flight plan and add it to the telemetry history list"""
+    g_v.rf.fetch_plane_status()
 
     """Starts the loop of RF comms that keeps fetching for plane
     status info and calling server comms' telemetry upload and

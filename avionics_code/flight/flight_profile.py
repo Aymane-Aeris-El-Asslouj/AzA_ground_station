@@ -1,4 +1,4 @@
-from avionics_code.helpers import parameters as para
+from avionics_code.helpers import parameters as para, global_variables as g_v
 import time
 
 TIME_CUT_OFF_FOR_FLIGHT_STATUS = para.TIME_CUT_OFF_FOR_FLIGHT_STATUS
@@ -20,6 +20,8 @@ class TelemetryHistory:
 
         # get rid of all outdated profiles
         self.clean_outdated()
+
+        g_v.mc.refresh_mission_state()
 
     def last_flight_profile(self):
         """returns last flight profile added to list"""

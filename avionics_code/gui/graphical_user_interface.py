@@ -311,6 +311,9 @@ class GUI:
                     pre_waypoint = g_v.ms.waypoint_list[index - 1]
                     delta_pos = g_f.sub_vectors(waypoint.pos, pre_waypoint.pos)
                     d_f.draw_arrow(surf, pre_waypoint, delta_pos, (0, 255, 255))
+                    if pre_waypoint.target is not None:
+                        delta_pos = g_f.sub_vectors(pre_waypoint.target, pre_waypoint.pos)
+                        d_f.draw_arrow(surf, pre_waypoint, delta_pos, (0, 0, 0))
 
         self.screen.blit(surf, (0, 0))
 
@@ -423,12 +426,10 @@ class GUI:
             "Generate button": (BLACK, 1.3, 1.0, 2),
             "waypoint mission button": (RED, 1.22, 2.0, 2),
             "airdrop mission button": (RED, 1.22, 2.5, 2),
-            "search mission button": (RED, 1.22, 3.0, 2),
-            "mapping mission button": (RED, 1.22, 3.5, 2),
-            "off-axis object mission button": (RED, 1.22, 4.0, 2),
-            "off-axis search mission button": (RED, 1.22, 4.5, 2),
-            "off-axis map mission button": (RED, 1.22, 5.0, 2),
-            "landing mission button": (RED, 1.22, 5.5, 2),
+            "scouting mission button": (RED, 1.22, 3.0, 2),
+            "off axis scout mission button": (RED, 1.22, 3.5, 2),
+            "requested scout mission button": (RED, 1.22, 4.0, 2),
+            "landing loiter mission button": (RED, 1.22, 4.5, 2),
             "land button": (BLACK, 1.3, 10.0, 2),
             "ending mission button": (RED, 1.3, 11.0, 2),
             "drop authorization button": (BLACK, 1.3, 12.0, 2),
@@ -468,12 +469,10 @@ class GUI:
         self.mission_state_display_dict = {
             0: "waypoint mission button",
             1: "airdrop mission button",
-            2: "search mission button",
-            3: "mapping mission button",
-            4: "off-axis object mission button",
-            5: "off-axis search mission button",
-            6: "off-axis map mission button",
-            7: "landing mission button"
+            2: "scouting mission button",
+            3: "off axis scout mission button",
+            4: "requested scout mission button",
+            5: "landing loiter mission button",
         }
 
         # Text dictionary
@@ -498,12 +497,10 @@ class GUI:
             'mission plan:': (WHITE, 1.3, 1.5),
             'waypoints': (WHITE, 1.31, 2.0),
             'airdrop': (WHITE, 1.31, 2.5),
-            'search': (WHITE, 1.31, 3.0),
-            'mapping': (WHITE, 1.31, 3.5),
-            'off-axis object': (WHITE, 1.31, 4.0),
-            'off-axis search': (WHITE, 1.31, 4.5),
-            'off-axis map': (WHITE, 1.31, 5.0),
-            'landing loiter': (WHITE, 1.31, 5.5),
+            'scouting': (WHITE, 1.31, 3.0),
+            'off axis scout': (WHITE, 1.31, 3.5),
+            'requested scout': (WHITE, 1.31, 4.0),
+            'landing loiter': (WHITE, 1.31, 4.5),
             'land': (BLACK, 1.3, 9.5),
             'ending mission': (RED, 1.3, 10.5),
             'authorize airdrop': (BLACK, 1.3, 11.5),

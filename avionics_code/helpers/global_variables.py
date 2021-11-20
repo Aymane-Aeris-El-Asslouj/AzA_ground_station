@@ -1,5 +1,8 @@
 """Global variables for the access of the whole code"""
 
+"""start time of the program"""
+init_time = None
+
 """Server comms object"""
 sc = None
 

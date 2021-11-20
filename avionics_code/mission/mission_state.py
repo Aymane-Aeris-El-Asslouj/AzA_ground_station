@@ -23,8 +23,8 @@ class MissionState:
 
     def generate(self):
         """Generates waypoint list for whole mission including
-        mission waypoints, airdrop, object search, mapping,
-        off axis object, and landing"""
+        mission waypoints, airdrop, scouting,
+        off axis scouting, and landing"""
 
         print("\nGenerating mission state...")
         generated_list = list()
@@ -46,38 +46,20 @@ class MissionState:
             print("Warning: airdrop position is not valid, airdrop will not attempt")
 
         # add scouting of search area
-        cover, off_axis_group_1 = self.scout_area(g_v.mp.search_area, generated_list, 2)
+        cover, off_axis_group = self.scout_2area(g_v.mp.search_area, g_v.mp.mapping_area, generated_list, 2)
         generated_list.extend(cover)
-
-        # add scouting of mapping area
-        cover, off_axis_group_2 = self.scout_area(g_v.mp.mapping_area, generated_list, 3)
-        generated_list.extend(cover)
-
-        # add off-axis object imaging
-        off_axis_object_waypoint = self.border_off_axis_imaging(4, g_v.mp.off_axis_object)
-        if off_axis_object_waypoint is not None:
-            generated_list.append(off_axis_object_waypoint)
-        else:
-            print("Warning: Could not make waypoint for off-axis object, will not attempt")
 
         # add off-axis search imaging
-        off_axis_trajectory, failed = self.bulk_off_axis(off_axis_group_1, generated_list, 5)
+        off_axis_trajectory, failed = self.bulk_off_axis(off_axis_group, generated_list, g_v.mp.off_axis_object, 3)
         for failed_waypoint in failed:
             print(f'Warning: Could not find off-axis waypoint for search waypoint at '
-                  f'{failed_waypoint.pos}, will not attempt')
-        generated_list.extend(off_axis_trajectory)
-
-        # add off-axis mapping imaging
-        off_axis_trajectory, failed = self.bulk_off_axis(off_axis_group_2, generated_list, 6)
-        for failed_waypoint in failed:
-            print(f'Warning: Could not find off-axis waypoint for mapping waypoint at '
                   f'{failed_waypoint.pos}, will not attempt')
         generated_list.extend(off_axis_trajectory)
 
         # add landing
         loiter_tuple = geo_f.geographic_to_cartesian_center(LANDING_LOITER_CENTER)
         loiter_altitude = LANDING_LOITER_CENTER["altitude"]
-        landing_loiter_waypoint = p_o.Waypoint(7, loiter_tuple, loiter_altitude, is_mission=True)
+        landing_loiter_waypoint = p_o.Waypoint(5, loiter_tuple, loiter_altitude, is_mission=True)
         if landing_loiter_waypoint.is_valid(g_v.mp):
             generated_list.append(landing_loiter_waypoint)
         else:
@@ -97,7 +79,7 @@ class MissionState:
         # get loiter position for landing
         loiter_tuple = geo_f.geographic_to_cartesian_center(LANDING_LOITER_CENTER)
         loiter_altitude = LANDING_LOITER_CENTER["altitude"]
-        landing_loiter_waypoint = p_o.Waypoint(7, loiter_tuple, loiter_altitude, is_mission=True)
+        landing_loiter_waypoint = p_o.Waypoint(5, loiter_tuple, loiter_altitude, is_mission=True)
         if landing_loiter_waypoint.is_valid(g_v.mp):
             self.waypoint_list.append(landing_loiter_waypoint)
         else:
@@ -106,7 +88,7 @@ class MissionState:
             g_v.rf.end_mission()
 
     @staticmethod
-    def scout_area(area, generated_list, mission_index):
+    def scout_2area(area1, area2, generated_list, mission_index):
         """return list of waypoints that cover an polygonal
         area with squares for picture purposes, and a list of
         positions that are not valid and need to be taken
@@ -116,16 +98,26 @@ class MissionState:
         off_axis_group = list()
 
         # need at least 3 points to have a true polygon
-        if len(area.vertices) < 3:
-            return cover, off_axis_group
+        if len(area1.vertices) < 3 and len(area2.vertices) < 3:
+            return cover
 
-        vertices_pos = [vertex.pos for vertex in area.vertices]
+        if len(area1.vertices) > 2:
+            vertices1_pos = [vertex.pos for vertex in area1.vertices]
+        else:
+            vertices1_pos = list()
+
+        if len(area2.vertices) > 2:
+            vertices2_pos = [vertex.pos for vertex in area2.vertices]
+        else:
+            vertices2_pos = list()
+
+        vertices_all_pos = vertices1_pos + vertices2_pos
 
         # determine square edges of area
-        min_area_x = min(pos[0] for pos in vertices_pos)
-        max_area_x = max(pos[0] for pos in vertices_pos)
-        min_area_y = min(pos[1] for pos in vertices_pos)
-        max_area_y = max(pos[1] for pos in vertices_pos)
+        min_area_x = min(pos[0] for pos in vertices_all_pos)
+        max_area_x = max(pos[0] for pos in vertices_all_pos)
+        min_area_y = min(pos[1] for pos in vertices_all_pos)
+        max_area_y = max(pos[1] for pos in vertices_all_pos)
         width = max_area_x - min_area_x
         height = max_area_y - min_area_y
 
@@ -135,7 +127,7 @@ class MissionState:
         without going outside the border or entering an
         obstacle"""
         SIZE = CV_IMAGE_GROUND_SIZE
-        cell_array = list()
+        way_array = list()
         pairs = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
         for row_index in range(math.ceil(height/SIZE)):
             for column_index in range(math.ceil(width/SIZE)):
@@ -146,35 +138,59 @@ class MissionState:
                 # get corners of area covered by search point
                 S = SIZE / 2
                 corners = [(cell_x + pair[0] * S, cell_y + pair[1] * S) for pair in pairs]
-                inside = [g_f.point_inside_polygon(pos, vertices_pos) for pos in corners]
+                if len(vertices1_pos) != 0:
+                    inside1 = [g_f.point_inside_polygon(pos, vertices1_pos) for pos in corners]
+                else:
+                    inside1 = list()
+                if len(vertices2_pos) != 0:
+                    inside2 = [g_f.point_inside_polygon(pos, vertices2_pos) for pos in corners]
+                else:
+                    inside2 = list()
 
                 """check if the area covers part of the search area"""
-                if any(inside):
+                if any(inside1) or any(inside2):
                     if p_o.Waypoint(mission_index, cell, is_mission=True).is_valid(g_v.mp):
-                        cell_array.append((cell_x, cell_y))
+                        way_array.append(p_o.Waypoint(mission_index, cell, IMAGING_ALTITUDE, is_mission=True))
                     else:
-                        off_axis_group.append(p_o.Waypoint(mission_index, (cell_x, cell_y), is_mission=True))
+                        O_A = OFF_AXIS_IMAGING_ALTITUDE
+                        off_axis_group.append(p_o.Waypoint(3, cell, O_A, is_mission=True))
                 else:
-                    intersection = False
+                    intersection1 = False
                     # check if the edges of the covered area intersect with search area
-                    for index in range(len(vertices_pos)):
-                        vertex_1 = vertices_pos[index]
-                        vertex_2 = vertices_pos[(index+1) % len(vertices_pos)]
+                    for index in range(len(vertices1_pos)):
+                        vertex_1 = vertices1_pos[index]
+                        vertex_2 = vertices1_pos[(index+1) % len(vertices1_pos)]
                         for index_2 in range(len(corners)):
                             corner_1 = corners[index_2]
                             corner_2 = corners[(index_2 + 1) % len(corners)]
                             inter = g_f.seg_to_seg_intersection
                             if inter(vertex_1, vertex_2, corner_1, corner_2):
-                                intersection = True
+                                intersection1 = True
                                 break
-                        if intersection:
+                        if intersection1:
                             break
 
-                    if intersection:
+                    intersection2 = False
+                    # check if the edges of the covered area intersect with search area
+                    for index in range(len(vertices2_pos)):
+                        vertex_1 = vertices2_pos[index]
+                        vertex_2 = vertices2_pos[(index + 1) % len(vertices2_pos)]
+                        for index_2 in range(len(corners)):
+                            corner_1 = corners[index_2]
+                            corner_2 = corners[(index_2 + 1) % len(corners)]
+                            inter = g_f.seg_to_seg_intersection
+                            if inter(vertex_1, vertex_2, corner_1, corner_2):
+                                intersection2 = True
+                                break
+                        if intersection2:
+                            break
+
+                    if intersection1 or intersection2:
                         if p_o.Waypoint(mission_index, cell, is_mission=True).is_valid(g_v.mp):
-                            cell_array.append((cell_x, cell_y))
+                            way_array.append(p_o.Waypoint(mission_index, cell, IMAGING_ALTITUDE, is_mission=True))
                         else:
-                            off_axis_group.append(p_o.Waypoint(mission_index, (cell_x, cell_y), is_mission=True))
+                            O_A = OFF_AXIS_IMAGING_ALTITUDE
+                            off_axis_group.append(p_o.Waypoint(3, cell, O_A, is_mission=True))
 
         # last waypoint of the plane
         if len(generated_list) > 0:
@@ -186,8 +202,7 @@ class MissionState:
 
         # use the coverage finder to find a path
         # to get the list of cells to go through
-        cover = c_f.cover(cell_array, last_pos, g_v.mp)
-        cover = [p_o.Waypoint(mission_index, pos, IMAGING_ALTITUDE, is_mission=True) for pos in cover]
+        cover = c_f.cover(way_array, last_pos, g_v.mp)
 
         return cover, off_axis_group
 
@@ -221,7 +236,8 @@ class MissionState:
 
             # get new point for off axis imaging
             closest_point = g_f.add_vectors(vec_scaled, pos)
-            new_way = p_o.Waypoint(mission_index, closest_point, OFF_AXIS_IMAGING_ALTITUDE, is_mission=True)
+            O_A = OFF_AXIS_IMAGING_ALTITUDE
+            new_way = p_o.Waypoint(mission_index, closest_point, O_A, is_mission=True, target=pos)
 
             if new_way.is_valid(g_v.mp):
                 new_waypoints.append((new_way, image_distance))
@@ -238,12 +254,20 @@ class MissionState:
         else:
             return None
 
-    def bulk_off_axis(self, off_axis_group, generated_list, mission_index):
+    def bulk_off_axis(self, off_axis_group, generated_list, off_axis_obj, mission_index):
         """returns trajectory for taking off-axis images
         for a group of points"""
 
         # failed off axis list for points where off axis imagine was not possible
         failed_off_axis_list = list()
+
+        # add off-axis object imaging
+        off_axis_way = []
+        off_axis_object_waypoint = self.border_off_axis_imaging(3, off_axis_obj)
+        if off_axis_object_waypoint is not None:
+            off_axis_way.append(off_axis_object_waypoint)
+        else:
+            print("Warning: Could not make waypoint for off-axis object, will not attempt")
 
         # split them into inside border and outside border
         outside_border = list()
@@ -259,7 +283,7 @@ class MissionState:
         for way in outside_border:
             new_way = self.border_off_axis_imaging(mission_index, way)
             if new_way is not None:
-                outside_border_new.append(new_way.pos)
+                outside_border_new.append(new_way)
             else:
                 failed_off_axis_list.append(way)
 
@@ -277,7 +301,7 @@ class MissionState:
         for way in close_to_border:
             new_way = self.border_off_axis_imaging(mission_index, way, inside=True)
             if new_way is not None:
-                inside_border_new_1.append(new_way.pos)
+                inside_border_new_1.append(new_way)
             else:
                 failed_off_axis_list.append(way)
 
@@ -308,7 +332,8 @@ class MissionState:
             # get off axis imaging point
             image_distance = g_f.norm(vec_scaled) - CV_IMAGE_GROUND_SIZE
             closest_point = g_f.add_vectors(vec_scaled, way.pos)
-            new_way = closest_point
+            O_A = OFF_AXIS_IMAGING_ALTITUDE
+            new_way = p_o.Waypoint(mission_index, closest_point, O_A, is_mission=True, target=way.pos)
 
             # check that the point is valid and close enough for off axis imaging
             A = p_o.Waypoint(mission_index, closest_point, is_mission=True).is_valid(g_v.mp)
@@ -318,7 +343,7 @@ class MissionState:
             else:
                 failed_off_axis_list.append(way)
 
-        new_positions = outside_border_new + inside_border_new_1 + inside_border_new_2
+        new_positions = off_axis_way + outside_border_new + inside_border_new_1 + inside_border_new_2
 
         # last waypoint of the plane
         if len(generated_list) > 0:
@@ -331,6 +356,5 @@ class MissionState:
         # use the coverage finder to find a path
         # to get the list of new positions
         cover = c_f.cover(new_positions, last_pos, g_v.mp, off_axis=True)
-        cover = [p_o.Waypoint(mission_index, pos, OFF_AXIS_IMAGING_ALTITUDE, is_mission=True) for pos in cover]
 
         return cover, failed_off_axis_list

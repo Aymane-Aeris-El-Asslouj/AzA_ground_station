@@ -1,7 +1,11 @@
-from avionics_code.helpers import geography_functions as gg_f, global_variables as g_v
+from avionics_code.helpers import global_variables as g_v, geography_functions as gg_f
+from avionics_code.helpers import parameters as para
+from avionics_code.communications import generate_plan as g_p
 
 import json
 import time
+
+MAP_REF = para.MAP_REF
 
 class RFComs:
 
@@ -11,12 +15,12 @@ class RFComs:
     def connect(self):
         """Connects to plane"""
 
-        print("fake connection to plane")
+        print("\nfake connection to plane")
 
     def fetch_plane_status(self):
         """Gets position and velocity/attitude of plane"""
 
-        print("fake get plane status (loads local plane.json)")
+        print("\nfake get plane status (loads local plane.json)")
 
         with open("extra files/plane.json") as f:
             data = json.load(f)
@@ -40,3 +44,28 @@ class RFComs:
 
         print("\nfake airdrop authorization")
 
+    def drop_ugv(self):
+        """drops ugv"""
+
+        print("\nfake ugv drop")
+
+    def take_picture(self):
+        """takes picture"""
+
+        print("\nfake picture")
+
+    def take_off_axis_picture(self):
+        """takes off axis picture"""
+
+        print("\nfake off axis picture")
+
+    def export_path(self, path):
+        """makes path into plan and exports it to the pixhawk"""
+        path = path
+        border = g_v.mp.border
+        center = MAP_REF
+
+        boundary = [vertex.pos for vertex in border.vertices]
+        waypoints = [way.pos for way in path.waypoint_list]
+
+        g_p.generate_plan(boundary, waypoints, center)

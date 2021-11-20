@@ -1,5 +1,6 @@
 from avionics_code.path import path_objects as p_o
 from avionics_code.helpers import parameters as para, algebraic_functions as a_f
+from avionics_code.helpers import geometrical_functions as g_f
 
 import copy
 
@@ -70,9 +71,9 @@ def single_path(way_1, way_2, profile):
         being searched and the others to list of paths found"""
         for new_path in path_extensions:
             # get last node of path
-            last_node_of_path = new_path.waypoint_list[ - 1]
+            last_node_of_path = new_path.waypoint_list[-1]
             # Check if new node is not already in the path
-            if not best_path.contains_waypoint(last_node_of_path):
+            if not g_f.float_eq_2d(last_node_of_path.pos, new_path.waypoint_list[-2].pos):
                 # check if path is useful (not bouncing off obstacle/border
                 # vertex or going backwards)
                 is_useful = True
@@ -111,7 +112,7 @@ def single_path(way_1, way_2, profile):
         if attempts >= MAX_ATTEMPTS_PER_WAYPOINTS:
             return None
 
-def straight_2d_path_finder(start_position, waypoint_list, profile):
+def straight_2d_path_finder(plane_obj, waypoint_list, profile):
     """from a set of 2d waypoints, returns a list of 2d
     straight paths that connect them while avoiding obstacles
     this list contains, for each two waypoints given,
@@ -121,14 +122,14 @@ def straight_2d_path_finder(start_position, waypoint_list, profile):
     border = profile.border
 
     """create the total number of nodes to connect by adding the
-    starting position as a node to the mission waypoints""",
+    starting position as a node to the mission waypoints"""
 
     if len(waypoint_list) > 0:
         mission_index = waypoint_list[0].mission_index
     else:
         mission_index = 0
 
-    start_point = p_o.Waypoint(mission_index, start_position)
+    start_point = p_o.Waypoint(mission_index, plane_obj.pos, plane_obj.z)
     true_waypoint_list = [start_point] + waypoint_list
 
     """Each two waypoints from the true waypoint list will be connected by up to PATHS_PER_WAYPOINTS straight line
@@ -195,9 +196,9 @@ def straight_2d_path_finder(start_position, waypoint_list, profile):
             being searched and the others to list of paths found"""
             for new_path in path_extensions:
                 # get last node of path
-                last_node_of_path = new_path.waypoint_list[- 1]
+                last_node_of_path = new_path.waypoint_list[-1]
                 # Check if new node is not already in the path
-                if not best_path.contains_waypoint(last_node_of_path):
+                if not g_f.float_eq_2d(last_node_of_path.pos, new_path.waypoint_list[-2].pos):
                     # check if path is useful (not bouncing off obstacle/border
                     # vertex or going backwards)
                     is_useful = True
