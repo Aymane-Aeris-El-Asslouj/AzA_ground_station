@@ -372,8 +372,7 @@ class GUI:
                     if self.mission_state_display[index] == 1:
                         subpath_to_draw = p_o.Path(sub_waypoint_list)
                         # pick path number path_index from each path path_group to draw with alternating colors
-                        d_f.draw_edges_alleviated_offset(subpath_to_draw, color=(204, 204, 0))
-                        d_f.draw_path_points_curved(subpath_to_draw, (204, 204, 0))
+                        d_f.draw_curved_path(subpath_to_draw)
 
 
         """

@@ -25,7 +25,7 @@ def distance_2d(p1, p2):
 def distance_3d(p1, p2):
     """distance between two 3d points"""
 
-    return math.hypot(p2[0] - p1[0], p2[1] - p1[1], p2[2] - p1[2])
+    return math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2 + (p2[2] - p1[2])**2)
 
 
 def center_2d(p1, p2):

@@ -288,7 +288,6 @@ def curving_2d(straight_2D_paths_list, profile):
 
                 # curve, generate off shoot points, and check if path is valid
                 stitched_path.curve(profile)
-                stitched_path.off_shoot()
                 ####if stitched_path.is_valid(profile):
                 curved_2d_paths_list.append(stitched_path)
                 a_f.increment_bound_var(path_vector, distribution, max_per_group, variation_num)

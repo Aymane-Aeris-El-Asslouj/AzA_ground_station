@@ -165,16 +165,14 @@ class Waypoint(MapObject):
     """z = None for Waypoints created during straight path generation,
     
     Waypoint object with x,y,z position, parent object,
-    and alleviation waypoint
+    and turn waypoint
     
     parent obstacle: node created on an obstacle during straight
                 path generation
     Parent border vertex:  node created on a border vertex during
                 straight path generation
-    alleviation waypoint: waypoint added during path curving to
-                make the turn on the waypoint easier
-    off waypoint: The position that the plane will go to
-                because of inertia after crossing the waypoint
+    pre turn waypoint: waypoint to make sure the plane goes through it
+    post turn waypoint: waypoint to make sure the plane goes through it
     mission index: index for what part of the mission they are
     is mission: is part of the mission state, so it was not added
                 for another purpose
@@ -187,8 +185,8 @@ class Waypoint(MapObject):
         self.z = z
         self.parent_obstacle = parent_obstacle
         self.parent_vertex = parent_vertex
-        self.alleviation_waypoint = None
-        self.off_waypoint = None
+        self.pre_turn_waypoint = None
+        self.post_turn_waypoint = None
         self.is_mission = is_mission
         self.target = target
     
@@ -256,46 +254,6 @@ class Waypoint(MapObject):
 
         return True
 
-    def is_arc_connectable_to(self, base_w, initial_w, turn_cen_w, profile_1):
-        """Checks if an arc can be constructed from self
-            to initial_w with center turn_cen_w coming from base_w"""
-        
-        node_1 = base_w.pos
-        node_2 = self.pos
-        node_3 = initial_w.pos
-        turn_cen = turn_cen_w.pos
-        if g_f.distinct_points_4(node_1, node_2, node_3, turn_cen):
-            middle = g_f.center_2d(node_2, node_3)
-            distance_to_center = g_f.distance_2d(self.pos, turn_cen)
-            if g_f.distinct_points_2(middle, turn_cen):
-                middle_1 = g_f.homothety_unit(middle, turn_cen, distance_to_center)
-                middle_2 = g_f.homothety_unit(middle, turn_cen, -distance_to_center)
-            else:
-                n_1, n_2 = g_f.unit_normal_vectors_to_line(node_2, node_3)
-                vec1 = g_f.scale_vector(n_1, distance_to_center)
-                vec2 = g_f.scale_vector(n_2, distance_to_center)
-                middle_1 = g_f.add_vectors(middle, vec1)
-                middle_2 = g_f.add_vectors(middle, vec2)
-            
-            vec_1 = g_f.sub_vectors(turn_cen, node_2)
-            vec_2 = g_f.sub_vectors(turn_cen, middle_1)
-            a_1 = g_f.find_angle(vec_1, g_f.sub_vectors(node_1, node_2))
-            a_2 = g_f.find_angle(vec_2, g_f.sub_vectors(node_3, middle_1))
-
-            # find which tangent point gives the right orientation for turning
-            if a_1 * a_2 < 0:
-                arc_middle_w = Waypoint(self.mission_index, middle_1)
-            else:
-                arc_middle_w = Waypoint(self.mission_index, middle_2)
-
-            c_1 = arc_middle_w.is_connectable_to(self, profile_1)
-            c_2 = arc_middle_w.is_connectable_to(initial_w, profile_1)
-            return c_1 and c_2
-        else:
-            return True
-        
-        return g_f.float_eq_2d(self.pos, waypoint_1.pos)
-
     def is_going_backwards(self, waypoint_1, waypoint_2):
         """Check if path is going backwards"""
     
@@ -339,22 +297,27 @@ class Waypoint(MapObject):
         else:
             return False
 
-    def alleviate(self, waypoint_1, waypoint_2, profile_1):
-        """adds an alleviation waypoint to make the turn easier"""
+    def turn_before(self, way_1, way_2, profile):
+        """adds an turn waypoint to make the turn easier considering pixhawk 4"""
 
-        p_r = PREFERRED_TURN_RADIUS
+        P_R = PREFERRED_TURN_RADIUS
 
-        node_1 = waypoint_1.pos
+        node_1 = way_1.pos
         node_2 = self.pos
-        node_3 = waypoint_2.pos
+        node_3 = way_2.pos
         if not g_f.distinct_points_3(node_1, node_2, node_3):
-            return
+            return None
+
+        # move node 2 by a turning radius away from node 3
+        # to take into account the pixhawk 4 turing when it reaches it
+        dis = P_R + g_f.distance_2d(node_2, node_3)
+        node_2 = g_f.homothety_unit(node_2, node_3, dis)
 
         # find two possible turn centers that would allow
         # to turn through node 2 to go into node 3
         n_1, n_2 = g_f.unit_normal_vectors_to_line(node_2, node_3)
-        turn_cen_1 = g_f.add_vectors(node_2, g_f.scale_vector(n_1, p_r))
-        turn_cen_2 = g_f.add_vectors(node_2, g_f.scale_vector(n_2, p_r))
+        turn_cen_1 = g_f.add_vectors(node_2, g_f.scale_vector(n_1, P_R))
+        turn_cen_2 = g_f.add_vectors(node_2, g_f.scale_vector(n_2, P_R))
 
         # Check which one is on the side of node 1
         if not g_f.seg_to_line_intersection(node_1, turn_cen_1, node_2, node_3):
@@ -362,99 +325,77 @@ class Waypoint(MapObject):
         else:
             turn_cen = turn_cen_2
 
-        alleviation_w = None
+        # Make sure node 1 is not inside the turn circle
+        if g_f.distance_2d(node_1, turn_cen) > P_R:
 
-        a_1 = g_f.find_angle((0, 1), g_f.sub_vectors(turn_cen, node_2))
-        a_2 = g_f.find_angle((0, 1), g_f.sub_vectors(node_3, node_2))
-        if -3.14 < a_2 - a_1 < 0 or 3.14 < a_2 - a_1 < 6.30:
-            rotation_unit = -0.1
-        else:
-            rotation_unit = +0.1
-
-        new_turn_cen = turn_cen
-        # Angle by which the turn center is shifted when the default turn is not possible
-        turn_offset = 0
-        
-        vec_1 = g_f.sub_vectors(node_1, node_2)
-        vec_2 = g_f.sub_vectors(new_turn_cen, node_2)
-        a_x = g_f.find_angle(vec_1, vec_2)
-
-        while -math.pi/2 < turn_offset < math.pi/2 or -math.pi/2 < a_x < math.pi/2:
-
-            a_x = g_f.find_angle(vec_1, vec_2)
-
-            # Make sure node 1 is not inside the turn circle
-            if g_f.distance_2d(node_1, new_turn_cen) > p_r:
-
-                # find tangent points on the turn circle coming node_1
-                node_a, node_b = g_f.tangent_points(node_1, new_turn_cen, p_r)
-                vec_1 = g_f.sub_vectors(node_2, new_turn_cen)
-                vec_2 = g_f.sub_vectors(node_3, node_2)
-                vec_3 = g_f.sub_vectors(node_a, node_1)
-                vec_4 = g_f.sub_vectors(new_turn_cen, node_a)
-                a_1 = g_f.find_angle(vec_1, vec_2)
-                a_2 = g_f.find_angle(vec_3, vec_4)
-
-                # find which tangent point gives the right orientation for turning
-                if a_1 * a_2 > 0:
-                    picked_w = Waypoint(self.mission_index, node_a)
-                else:
-                    picked_w = Waypoint(self.mission_index, node_b)
-
-                new_center_w = Waypoint(self.mission_index, new_turn_cen)
-
-                if picked_w.is_connectable_to(waypoint_1, profile_1):
-                    if picked_w.is_arc_connectable_to(waypoint_1, self, new_center_w, profile_1):
-                        if -math.pi/2 < turn_offset < math.pi/2:
-                            alleviation_w = picked_w
-                            break
-
-            # Change the turn center
-            turn_offset += rotation_unit
-            new_turn_cen = g_f.rotate_vector_with_center(turn_cen, node_2, turn_offset)
-
-        if alleviation_w is None:
-            self.alleviation_waypoint = alleviation_w
-        elif g_f.distance_2d(alleviation_w.pos, self.pos) > 2*NODE_MIN_DISTANCE:
-            self.alleviation_waypoint = alleviation_w
-        else:
-            self.alleviation_waypoint = None
-
-        # store turn center as the alleviation waypoint of off waypoint
-        self.off_waypoint = Waypoint(self.mission_index, (0, 0))
-        self.off_waypoint.alleviation_waypoint = Waypoint(self.mission_index, new_turn_cen)
-
-    def off_shoot(self, prev_waypoint, next_waypoint):
-        """Determines where the off waypoint is"""
-
-        p_r = PREFERRED_TURN_RADIUS
-        center = self.off_waypoint.alleviation_waypoint.pos
-        node_1 = prev_waypoint.pos
-        node_2 = self.pos
-        node_3 = next_waypoint.pos
-
-        if g_f.distance_2d(node_3, center) > p_r:
             # find tangent points on the turn circle coming node_1
-            node_a, node_b = g_f.tangent_points(node_3, center, p_r)
-            a_1 = g_f.find_angle(g_f.sub_vectors(center, node_2), g_f.sub_vectors(node_1, node_2))
-            a_2 = g_f.find_angle(g_f.sub_vectors(center, node_a), g_f.sub_vectors(node_3, node_a))
+            node_a, node_b = g_f.tangent_points(node_1, turn_cen, P_R)
 
-            a_3 = g_f.find_angle(g_f.sub_vectors(node_1, node_2), g_f.sub_vectors(node_3, node_2))
-
-            if abs(a_3) < math.pi / 2 and self.alleviation_waypoint is not None:
-                # find which tangent point gives the right orientation for turning
-                if g_f.distance_2d(node_a, node_2) < g_f.distance_2d(node_b, node_2):
-                    self.off_waypoint.pos = node_a
-                else:
-                    self.off_waypoint.pos = node_b
+            # find which tangent point gives the right orientation for turning
+            vec_1 = g_f.sub_vectors(node_2, turn_cen)
+            vec_2 = g_f.sub_vectors(node_3, node_2)
+            vec_3 = g_f.sub_vectors(node_a, node_1)
+            vec_4 = g_f.sub_vectors(turn_cen, node_a)
+            a_1 = g_f.find_angle(vec_1, vec_2)
+            a_2 = g_f.find_angle(vec_3, vec_4)
+            if a_1 * a_2 > 0:
+                turn_w_pos = node_a
             else:
-                # find which tangent point gives the right orientation for turning
-                if a_1 * a_2 < 0:
-                    self.off_waypoint.pos = node_a
-                else:
-                    self.off_waypoint.pos = node_b
+                turn_w_pos = node_b
+
+            # move the turning waypoint by a turning radius away from node 1
+            # to take into account the pixhawk 4 turing when it reaches it
+            dis = P_R + g_f.distance_2d(turn_w_pos, node_1)
+            new_pos = g_f.homothety_unit(turn_w_pos, node_1, dis)
+            turn_w = Waypoint(self.mission_index, new_pos)
+
+            # check that the picked turning waypoint is valid
+            if turn_w.is_connectable_to(way_1, profile) and turn_w.is_connectable_to(self, profile):
+                self.pre_turn_waypoint = turn_w
+                return True
+            else:
+                return False
         else:
-            self.off_waypoint.pos = None, None
+            return False
+
+    def turn_after(self, way_1, way_2, profile):
+        """adds a turn waypoint after itself to make sure the plane
+        goes through it"""
+
+        P_R = PREFERRED_TURN_RADIUS
+
+        # get all three points involved in the turn
+        node_1 = way_1.pos
+        node_2 = self.pos
+        node_3 = way_2.pos
+
+        if not g_f.distinct_points_3(node_1, node_2, node_3):
+            return None
+
+        # find a point after node 2 that is a turn radius away from it
+        dis = g_f.distance_2d(node_1, node_2) + P_R
+        turn_pos = g_f.homothety_unit(node_2, node_1, dis)
+
+        TURN_NUM = 50
+        node_1_to_2 = g_f.sub_vectors(node_2, node_1)
+        node_2_to_3 = g_f.sub_vectors(node_3, node_2)
+        base_angle = g_f.find_angle(node_1_to_2, node_2_to_3)
+
+        for turn_index in range(TURN_NUM):
+            turn_pos = g_f.rotate_vector_with_center(turn_pos, node_2, base_angle/TURN_NUM)
+
+            # check the turn waypoint is valid
+            turn_w = Waypoint(self.mission_index, turn_pos)
+            if turn_w.is_connectable_to(self, profile) and turn_w.is_connectable_to(way_2, profile):
+                if turn_index == 0:
+                    self.post_turn_waypoint = turn_w
+                    return True
+                elif self.turn_before(way_1, turn_w, profile):
+                    self.post_turn_waypoint = turn_w
+                    return True
+
+        # no turning points could be made
+        return False
 
 
 class Path:
@@ -465,7 +406,7 @@ class Path:
         self.simple_distance_2d = None
 
     def compute_simple_edges(self):
-        """Returns list of edges of the path without alleviation waypoints"""
+        """Returns list of edges of the path without turn waypoints"""
 
         edges_list = list()
         if len(self.waypoint_list) > 1:
@@ -475,12 +416,12 @@ class Path:
 
     def compute_simple_distance_2d(self):
         """computes 2D distance of the path without
-        considering altitude or alleviation waypoints"""
+        considering altitude or turn waypoints"""
 
         return sum(edge[0].distance_2d_to(edge[1]) for edge in self.compute_simple_edges())
 
     def compute_true_distance_2d(self):
-        """computes 2D distance of the path with alleviation waypoints"""
+        """computes 2D distance of the path with turn waypoints"""
 
         return sum(edge[0].distance_2d_to(edge[1]) for edge in self.compute_simple_edges())
 
@@ -496,35 +437,25 @@ class Path:
         self.distance_2d_update()
         return self.simple_distance_2d + g_f.distance_2d(last_node.pos, next_waypoint.pos)
 
-    def curve(self, profile_1):
-        """Curve path by adding alleviation waypoints"""
-
-        """add internal alleviation waypoints inside each path"""
-        if len(self.waypoint_list) > 2:
-            for way_index in range(1, len(self.waypoint_list) - 1):
-                prev_waypoint = self.waypoint_list[- 1 - way_index - 1]
-                cur_waypoint = self.waypoint_list[- 1 - way_index]
-                next_waypoint = self.waypoint_list[- 1 - way_index + 1]
-                if next_waypoint.alleviation_waypoint is not None:
-                    next_waypoint = next_waypoint.alleviation_waypoint
-                cur_waypoint.alleviate(prev_waypoint, next_waypoint, profile_1)
-
-    def off_shoot(self):
-        """finds off waypoints for path"""
+    def curve(self, profile):
+        """Curve path by adding turn waypoints"""
 
         if len(self.waypoint_list) > 2:
             for way_index in range(1, len(self.waypoint_list) - 1):
-                prev_waypoint = self.waypoint_list[way_index - 1]
-                cur_waypoint = self.waypoint_list[way_index]
-                next_waypoint = self.waypoint_list[way_index + 1]
-                if cur_waypoint.alleviation_waypoint is not None:
-                    prev_waypoint = cur_waypoint.alleviation_waypoint
-                if next_waypoint.alleviation_waypoint is not None:
-                    next_waypoint = next_waypoint.alleviation_waypoint
-                cur_waypoint.off_shoot(prev_waypoint, next_waypoint)
+
+                prev_way = self.waypoint_list[way_index - 1]
+                cur_way = self.waypoint_list[way_index]
+                next_way = self.waypoint_list[way_index + 1]
+
+                if prev_way.post_turn_waypoint is not None:
+                    prev_way = prev_way.post_turn_waypoint
+
+                # if mission point, make waypoint to go through it
+                if cur_way.is_mission:
+                    cur_way.turn_after(prev_way, next_way, profile)
 
     def is_valid(self, profile_1):
-        """Check if path is valid including alleviation waypoints"""
+        """Check if path is valid including turn waypoints"""
 
         for w_index, waypoint_i in enumerate(self.waypoint_list):
             if 0 < w_index < len(self.waypoint_list) - 1:
@@ -532,14 +463,14 @@ class Path:
                 if c_p.off_waypoint is not None:
                     c_p = c_p.off_waypoint
                 c_w = waypoint_i
-                if c_w.alleviation_waypoint is not None:
-                    c_p = c_w.alleviation_waypoint
+                if c_w.turn_waypoint is not None:
+                    c_p = c_w.turn_waypoint
                 next_waypoint = self.waypoint_list[w_index+1]
                 c_off_w = c_w.off_waypoint
                 c_off_next = next_waypoint.off_waypoint
-                al_w = next_waypoint.alleviation_waypoint
+                al_w = next_waypoint.turn_waypoint
                 if c_off_w is not None:
-                    turn_cen = c_off_w.alleviation_waypoint
+                    turn_cen = c_off_w.turn_waypoint
                     if c_off_w.pos != (None, None):
                         if not c_w.is_arc_connectable_to(c_p, c_off_w, turn_cen, profile_1):
                             return False
@@ -554,7 +485,7 @@ class Path:
                     if not c_w.is_connectable_to(next_waypoint, profile_1):
                         return False
                 else:
-                    turn_cen_2 = c_off_next.alleviation_waypoint
+                    turn_cen_2 = c_off_next.turn_waypoint
                     if not c_w.is_connectable_to(al_w, profile_1):
                         return False
                     if not al_w.is_arc_connectable_to(c_w, next_waypoint, turn_cen_2, profile_1):

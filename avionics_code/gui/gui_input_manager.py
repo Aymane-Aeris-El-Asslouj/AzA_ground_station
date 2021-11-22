@@ -60,6 +60,7 @@ def gui_input_manager_start():
                 def action_7():
                     g_v.ms.generate()
                     g_v.mc.compute_path()
+                    g_v.rf.export_path(g_v.mc.chosen_path)
 
                 def action_8():
                     g_v.ms.land()

@@ -42,6 +42,7 @@ def draw_rescaled_points(surface, map_object_list, selected, color, style=0):
             points = [(vertex_dash[0] + w_s * pair[0], vertex_dash[1] + w_s * pair[1]) for pair in pairs]
             pygame.draw.polygon(g_v.gui.screen, color, points)
 
+
 def draw_path_points_straight(path, color):
     """draw waypoints of path"""
 
@@ -49,95 +50,36 @@ def draw_path_points_straight(path, color):
         vertex_dash_1 = g_v.gui.dashboard_projection(path.waypoint_list[i])
         pygame.draw.circle(g_v.gui.screen, color, vertex_dash_1, WAYPOINT_SIZE)
 
-def draw_path_points_curved(path, color, altitude=False):
-    """draw waypoints of path including alleviation waypoints, offshoot waypoints
-    and optionally altitude"""
 
-    for i in range(len(path.waypoint_list)):
-        vertex_dash_1 = g_v.gui.dashboard_projection(path.waypoint_list[i])
-        pygame.draw.circle(g_v.gui.screen, color, vertex_dash_1, WAYPOINT_SIZE)
-        if altitude:
-            g_v.gui.draw_text_off(vertex_dash_1, str(int(path.waypoint_list[i].z)) + " ft")
-        vertex_off_w = path.waypoint_list[i].off_waypoint
-        # draw offshoot waypoint if there is
-        if vertex_off_w is not None:
-            if vertex_off_w.pos != (None, None):
-                vertex_off = g_v.gui.dashboard_projection(vertex_off_w)
-                pygame.draw.circle(g_v.gui.screen, (0, 255, 0), vertex_off, WAYPOINT_SIZE)
-        # draw alleviation waypoint if there is
-        if path.waypoint_list[i].alleviation_waypoint is not None:
-            alleviation_waypoint = path.waypoint_list[i].alleviation_waypoint
-            vertex_dash_mid = g_v.gui.dashboard_projection(alleviation_waypoint)
-            pygame.draw.circle(g_v.gui.screen, (255, 105, 180), vertex_dash_mid, WAYPOINT_SIZE)
-            if altitude:
-                pass  # g_v.gui.draw_text_off(vertex_dash_mid, str(int(alleviation_waypoint.z))+" ft")
+def draw_curved_path(curved_path):
+    """draw edges of curved path including turn waypoints"""
 
+    edges_to_draw = curved_path.compute_simple_edges()
 
-def draw_edges_alleviated_offset(map_structure, color):
-    """draw edges of map structure including alleviation and off shoot waypoints"""
+    for edge in edges_to_draw:
 
-    edges_to_draw = map_structure.compute_simple_edges()
-    for index, edge in enumerate(edges_to_draw):
-        """This part gets points to draw"""
         # Get previous vertex or its off shoot waypoint if it exists
         vertex_1 = g_v.gui.dashboard_projection(edge[0])
-        if edge[0].off_waypoint is not None:
-            if edge[0].off_waypoint.pos != (None, None):
-                vertex_1 = g_v.gui.dashboard_projection(edge[0].off_waypoint)
+        pygame.draw.circle(g_v.gui.screen, (255, 255, 0), vertex_1, WAYPOINT_SIZE)
         # Get next vertex
         vertex_2 = g_v.gui.dashboard_projection(edge[1])
-        # If the next vertex has an off shoot waypoint, use it to find center
-        # at that vertex
-        if edge[1].off_waypoint is not None:
-            if edge[1].off_waypoint.pos != (None, None):
-                #####line under this shouldn't exist
-                vertex_off = g_v.gui.dashboard_projection(edge[1].off_waypoint)
-            # Set zone to draw arcs around next vertex
-            center = g_v.gui.dashboard_projection(edge[1].off_waypoint.alleviation_waypoint)
-            radius = g_f.distance_2d(center, vertex_2)
-            rect = (center[0] - radius, center[1] - radius, 2 * radius, 2 * radius)
+        pygame.draw.circle(g_v.gui.screen, (255, 255, 0), vertex_2, WAYPOINT_SIZE)
 
-        """drawing starts here"""
-        if edge[1].alleviation_waypoint is None:
-            # draw line from off waypoint_1 to waypoint 2
-            """This part draws lines/areas from vertex 1 to vertex 2"""
-            if (edge[0].off_waypoint is not None and edge[0].off_waypoint.pos != (None, None)) or index == 0:
-                pygame.draw.line(g_v.gui.screen, color, vertex_1, vertex_2, width=2)
-            else:
-                # In the case where there is no offshoot waypoint, but a danger zone instead
-                p_r = PREFERRED_TURN_RADIUS
-                off_center = g_f.center_2d(vertex_1, vertex_2)
-                pygame.draw.circle(g_v.gui.screen, (0, 0, 0), off_center, 2 * p_r * g_v.gui.map_scaling, width=2)
-            # draw arc from waypoint 2 to off waypoint
-            """This part draws arcs around vertex 2"""
-            if edge[1].off_waypoint is not None:
-                if edge[1].off_waypoint.pos != (None, None):
-                    a_1, a_2 = g_f.find_arc_angles_dash(vertex_1, vertex_2, vertex_off, center)
-                    # only non-zero arcs
-                    if abs(a_1 - a_2) > 0.01:
-                        pygame.draw.arc(g_v.gui.screen, (0, 255, 0), rect, a_1, a_2, 2)
-        else:
-            # Get alleviation waypoint
-            vertex_mid = g_v.gui.dashboard_projection(edge[1].alleviation_waypoint)
-            # draw line from vertex 1 (or its off shoot waypoint) to alleviation waypoint
-            """This part draws lines/areas from vertex 1 to vertex 2"""
-            if index == 0 or (edge[0].off_waypoint is not None and edge[0].off_waypoint.pos != (None, None)):
-                pygame.draw.line(g_v.gui.screen, color, vertex_1, vertex_mid, width=2)
-            else:
-                # In the case where there is no offshoot waypoint, but a danger zone instead
-                p_r = PREFERRED_TURN_RADIUS
-                off_center = g_f.center_2d(vertex_1, vertex_mid)
-                pygame.draw.circle(g_v.gui.screen, (0, 0, 0), off_center, 2 * p_r * g_v.gui.map_scaling, width=2)
-            """This part draws arcs around vertex 2"""
-            # draw arc from alleviation waypoint to vertex 2
-            a_1, a_2 = g_f.find_arc_angles_dash(vertex_1, vertex_mid, vertex_2, center)
-            pygame.draw.arc(g_v.gui.screen, (255, 105, 180), rect, a_1, a_2, 2)
-            # draw arc from vertex 2 to off shoot waypoint
-            if edge[1].off_waypoint.pos != (None, None):
-                a_1, a_2 = g_f.find_arc_angles_dash(vertex_mid, vertex_2, vertex_off, center)
-                # only non-zero arcs
-                if abs(a_1 - a_2) > 0.01:
-                    pygame.draw.arc(g_v.gui.screen, (0, 255, 0), rect, a_1, a_2, 2)
+        # turn waypoint after vertex 1
+        if edge[0].post_turn_waypoint is not None:
+            after_turn = g_v.gui.dashboard_projection(edge[0].post_turn_waypoint)
+            pygame.draw.circle(g_v.gui.screen, (255, 105, 180), after_turn, WAYPOINT_SIZE)
+            pygame.draw.line(g_v.gui.screen, (255, 105, 180), vertex_1, after_turn)
+            vertex_1 = after_turn
+
+        # turn waypoint before vertex 2
+        if edge[1].pre_turn_waypoint is not None:
+            before_turn = g_v.gui.dashboard_projection(edge[1].pre_turn_waypoint)
+            pygame.draw.circle(g_v.gui.screen, (255, 105, 180), before_turn, WAYPOINT_SIZE)
+            pygame.draw.line(g_v.gui.screen, (255, 105, 180), before_turn, vertex_2)
+            vertex_2 = before_turn
+
+        pygame.draw.line(g_v.gui.screen, (255, 255, 0), vertex_1, vertex_2)
 
 
 def draw_arrow(surf, object_origin, map_vector, color):

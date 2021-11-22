@@ -51,7 +51,7 @@ VARIATIONS_FOR_PATH_BUILDING = 0  # max number of curved paths to get stitched d
 # Path logic parameters
 OBSTACLE_DISTANCE_FOR_VALID_PASS = 30  # (ft) Distance off from obstacles for path to be valid
 OBSTACLE_DISTANCE_FOR_VALID_NODE = 80  # (ft) Distance from obstacles at which nodes are created
-BORDER_DISTANCE_FOR_VALID_PASS = 30  # (ft) Distance off from border for path to be valid
+BORDER_DISTANCE_FOR_VALID_PASS = 80  # (ft) Distance off from border for path to be valid
 BORDER_DISTANCE_FOR_VALID_NODE = 100  # (ft) Distance from border vertices at which nodes are created
 NODE_MIN_DISTANCE = 10  # (ft) Distance between two nodes such that they are considered the same
 OBSTACLE_ORBIT_RATIO = 1.2  # factor that obstacle distance for pass is scaled by for minimum orbiting angle

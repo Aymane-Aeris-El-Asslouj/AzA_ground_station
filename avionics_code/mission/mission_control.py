@@ -140,8 +140,20 @@ class MissionControl:
 
         self.curved_2d_paths_list = p_f.curving_2d(self.straight_2d_paths_list, profile)
 
-        chosen_paths_list = [path_group[0] for path_group in self.straight_2d_paths_list]
-        chosen_paths_list = sum([path.waypoint_list[1:] for path in chosen_paths_list], [])
-        self.chosen_path = p_o.Path(chosen_paths_list)
+        curved_path = self.curved_2d_paths_list[0]
+        waypoint_list_new = list()
+        for way in curved_path.waypoint_list:
+
+            pre_turn_waypoint = way.pre_turn_waypoint
+            if pre_turn_waypoint is not None:
+                waypoint_list_new.append(pre_turn_waypoint)
+
+            waypoint_list_new.append(way)
+
+            post_turn_waypoint = way.post_turn_waypoint
+            if post_turn_waypoint is not None:
+                waypoint_list_new.append(post_turn_waypoint)
+
+        self.chosen_path = p_o.Path(waypoint_list_new)
 
         print("Path computed.")

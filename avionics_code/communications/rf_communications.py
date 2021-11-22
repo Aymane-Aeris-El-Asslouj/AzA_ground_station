@@ -1,9 +1,11 @@
 from avionics_code.helpers import global_variables as g_v, geography_functions as gg_f
 from avionics_code.helpers import parameters as para
-from avionics_code.communications import generate_plan as g_p
+from avionics_code.communications import generate_plan as g_p, export_plan as e_p
 
 import json
 import time
+
+import asyncio
 
 MAP_REF = para.MAP_REF
 
