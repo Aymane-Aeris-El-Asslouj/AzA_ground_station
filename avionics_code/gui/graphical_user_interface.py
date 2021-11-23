@@ -1,11 +1,9 @@
 import pygame
 import time
 
-from avionics_code.flight import flight_profile as f_p
 from avionics_code.helpers import geometrical_functions as g_f, parameters as para
 from avionics_code.helpers import algebraic_functions as a_f, global_variables as g_v
 from avionics_code.gui import drawing_functions as d_f
-from avionics_code.path import path_objects as p_o
 
 
 DEFAULT_MAP_SIZE = para.DEFAULT_MAP_SIZE
@@ -37,7 +35,7 @@ class GUI:
         # path to show
         self.selected_path = 0
         # parts of the mission state to show
-        self.mission_state_display = [1]*8
+        self.mission_state_display = [1]*6
 
         # set the map_scaling to fit it
         self.map_scaling = DASHBOARD_SIZE / DEFAULT_MAP_SIZE
@@ -55,7 +53,6 @@ class GUI:
         self.buttons = None
         self.input_type_dict = None
         self.texts = None
-        self.status_type_dict = None
         self.mission_state_display_dict = None
         self.interface_init()
 
@@ -105,15 +102,6 @@ class GUI:
             else:
                 B = self.buttons[self.mission_state_display_dict[key]]
                 self.buttons[self.mission_state_display_dict[key]] = (RED, B[1], B[2], B[3])
-
-        # change color of path buttons
-        for key in self.status_type_dict:
-            if self.path_display_mode == key:
-                B = self.buttons[self.status_type_dict[key]]
-                self.buttons[self.status_type_dict[key]] = (GREEN, B[1], B[2], B[3])
-            else:
-                B = self.buttons[self.status_type_dict[key]]
-                self.buttons[self.status_type_dict[key]] = (RED, B[1], B[2], B[3])
 
         # for displaying buttons
         for key in self.buttons:
@@ -320,75 +308,20 @@ class GUI:
     def draw_current_path(self):
         """draw current path to be exported or already
         exported to the plane"""
-        straight_2d_paths_list = g_v.mc.straight_2d_paths_list
-        curved_2d_paths_list = g_v.mc.curved_2d_paths_list
+        chosen_path = g_v.mc.chosen_path
 
-        """draw straight line paths"""
-        if self.path_display_mode == 0:
-            rotator = a_f.rgb_rotate()
-            # draw each path in a different color that shifts between mission points
-            # pick path number path_index from each path path_group to draw with alternating colors
-            for path_group_index, path_group_i in enumerate(straight_2d_paths_list):
-
-                if path_group_i is not None:
-                    # find target waypoint of this path path_group and what part of the mission it is
-                    target_waypoint = path_group_i[0].waypoint_list[-1]
-                    mission_index = target_waypoint.mission_index
-                    # draw the waypoint with an arrow coming from the previous
-                    # waypoint if the mission index is to be displayed
-                    if self.mission_state_display[mission_index] == 1:
-                        # check if the selected path index has a sub-path inside the path_group
-                        if self.selected_path < len(path_group_i):
-                            # find the color of the path path_group
-                            color_factor = (path_group_index / PATH_COLORING_CYCLE)
-                            rotator.set_hue_rotation(color_factor * 360)
-                            # get the path to be draw from the path path_group
-                            path_to_draw = path_group_i[self.selected_path]
-                            # draw the selected path from the path path_group
-                            points = [self.dashboard_projection(way) for way in path_to_draw.waypoint_list]
-                            color = rotator.apply(255, 0, 0)
-                            pygame.draw.aalines(self.screen, color, False, points)
-                            d_f.draw_path_points_straight(path_to_draw, color)
-
-            """draw curved paths"""
-        elif self.path_display_mode == 1:
-            # draw selected curved path
-            if self.selected_path < len(curved_2d_paths_list):
-
-                # whole path to draw
-                path_to_draw = curved_2d_paths_list[self.selected_path]
-
-                # classify the waypoints of the path to draw
-                parts_to_draw = list()
-                for i in range(8):
-                    parts_to_draw.append(list())
-                for way in path_to_draw.waypoint_list:
-                    parts_to_draw[way.mission_index].append(way)
-                for index in range(7):
-                    parts_to_draw[index+1].append(parts_to_draw[index][-1])
-
-                # run over all waypoints of the curved path
-                for index, sub_waypoint_list in enumerate(parts_to_draw):
-                    if self.mission_state_display[index] == 1:
-                        subpath_to_draw = p_o.Path(sub_waypoint_list)
-                        # pick path number path_index from each path path_group to draw with alternating colors
-                        d_f.draw_curved_path(subpath_to_draw)
-
-
-        """
-        elif self.path_display_mode == 2:
-            # draw path
-            if self.selected_path < len(curved_3d_paths_list):
-                path_to_draw = curved_3d_paths_list[self.selected_path]
-                # pick path number path_index from each path path_group to draw with alternating colors
-                self.draw_edges_alleviated_offset(path_to_draw, color=(204, 204, 0))
-                self.draw_path_points(path_to_draw, (204, 204, 0), altitude=True)
-
-        elif self.path_display_mode == 3:
-            # draw chosen path
-            self.draw_edges_alleviated_offset(chosen_3d_path, color=(204, 204, 0))
-            self.draw_path_points(chosen_3d_path, (204, 204, 0), altitude=True)
-        """
+        # run over all waypoints of the curved path
+        rotator = a_f.rgb_rotate()
+        pre_way = None
+        for index, way in enumerate(chosen_path.waypoint_list):
+            if self.mission_state_display[way.mission_index] == 1:
+                # draw the selected path from the path path_group
+                if pre_way is not None:
+                    color_factor = index/PATH_COLORING_CYCLE
+                    rotator.set_hue_rotation(color_factor * 360)
+                    color = rotator.apply(255, 0, 0)
+                    d_f.draw_curved_edge(pre_way, way, color)
+            pre_way = chosen_path.waypoint_list[index]
 
     def interface_init(self):
         """Defines dictionaries for the interface"""
@@ -422,22 +355,18 @@ class GUI:
             "Plane button": (WHITE, 1.1, 13.0, 2),
             "Reload 2 button": (BLACK, 1.05, 14.0, 2),
             "Clear 2 button": (BLACK, 1.15, 14.0, 2),
-            "Generate button": (BLACK, 1.3, 1.0, 2),
-            "waypoint mission button": (RED, 1.22, 2.0, 2),
-            "airdrop mission button": (RED, 1.22, 2.5, 2),
-            "scouting mission button": (RED, 1.22, 3.0, 2),
-            "off axis scout mission button": (RED, 1.22, 3.5, 2),
-            "requested scout mission button": (RED, 1.22, 4.0, 2),
-            "landing loiter mission button": (RED, 1.22, 4.5, 2),
+            "waypoint mission button": (RED, 1.22, 1.0, 2),
+            "airdrop mission button": (RED, 1.22, 1.5, 2),
+            "scouting mission button": (RED, 1.22, 2.0, 2),
+            "off axis scout mission button": (RED, 1.22, 2.5, 2),
+            "requested scout mission button": (RED, 1.22, 3.0, 2),
+            "landing loiter mission button": (RED, 1.22, 3.5, 2),
+            "Generate button": (BLACK, 1.3, 4.5, 2),
+            "Compute button": (BLACK, 1.3, 5.5, 2),
+            "Export button": (BLACK, 1.3, 6.5, 2),
             "land button": (BLACK, 1.3, 10.0, 2),
             "ending mission button": (RED, 1.3, 11.0, 2),
-            "drop authorization button": (BLACK, 1.3, 12.0, 2),
-            "Straight paths button": (RED, 1.22, 6.5, 2),
-            "Curved paths button": (RED, 1.22, 7.0, 2),
-            "3D paths button": (RED, 1.22, 7.5, 2),
-            "Chosen path button": (RED, 1.22, 8.0, 2),
-            "Path <- button": (RED, 1.28, 9.0, 2),
-            "Path -> button": (RED, 1.32, 9.0, 2),
+            "drop authorization button": (BLACK, 1.3, 12.0, 2)
         }
 
         # input type of each button
@@ -454,14 +383,6 @@ class GUI:
             9: "Mapping area button",
             10: "Plane/UGV button",
             11: "Plane button"
-        }
-
-        # status type of each button
-        self.status_type_dict = {
-            0: "Straight paths button",
-            1: "Curved paths button",
-            2: "3D paths button",
-            3: "Chosen path button"
         }
 
         # status type of each button
@@ -492,24 +413,19 @@ class GUI:
             'Plane position': (WHITE, 1.1, 12.5),
             'Reload 2': (BLACK, 1.05, 13.5),
             'Clear 2': (BLACK, 1.15, 13.5),
-            'Generate mission': (BLACK, 1.3, 0.5),
-            'mission plan:': (WHITE, 1.3, 1.5),
-            'waypoints': (WHITE, 1.31, 2.0),
-            'airdrop': (WHITE, 1.31, 2.5),
-            'scouting': (WHITE, 1.31, 3.0),
-            'off axis scout': (WHITE, 1.31, 3.5),
-            'requested scout': (WHITE, 1.31, 4.0),
-            'landing loiter': (WHITE, 1.31, 4.5),
+            'path display:': (WHITE, 1.3, 0.5),
+            'waypoints': (WHITE, 1.31, 1.0),
+            'airdrop': (WHITE, 1.31, 1.5),
+            'scouting': (WHITE, 1.31, 2.0),
+            'off axis scout': (WHITE, 1.31, 2.5),
+            'requested scout': (WHITE, 1.31, 3.0),
+            'landing loiter': (WHITE, 1.31, 3.5),
+            'Generate mission': (BLACK, 1.3, 4.0),
+            'Compute path': (BLACK, 1.3, 5.0),
+            'Export path': (BLACK, 1.3, 6.0),
             'land': (BLACK, 1.3, 9.5),
             'ending mission': (RED, 1.3, 10.5),
             'authorize airdrop': (BLACK, 1.3, 11.5),
-            'display Mode:': (WHITE, 1.3, 6.0),
-            'straight_paths': (WHITE, 1.31, 6.5),
-            'curved_paths': (WHITE, 1.31, 7.0),
-            '3d_paths': (WHITE, 1.31, 7.5),
-            'chosen_path': (WHITE, 1.31, 8.0),
-            'selected path:': (WHITE, 1.3, 8.5),
-            '<--             -->': (WHITE, 1.3, 9.0),
         }
 
     def dashboard_projection(self, map_object):
@@ -533,26 +449,3 @@ class GUI:
         inv_x = (dash_board_position[0] - DASHBOARD_SIZE / 2) / self.map_scaling
         inv_y = (DASHBOARD_SIZE / 2 - dash_board_position[1]) / self.map_scaling
         return inv_x, inv_y
-
-    def clamp_display_mode(self):
-        """Limit selected path to the number of paths available"""
-
-        straight_2d_paths_list = g_v.mc.straight_2d_paths_list
-        curved_2d_paths_list = g_v.mc.curved_2d_paths_list
-        ####curved_3d_paths_list = g_v.mp.curved_3d_paths_list
-        if self.path_display_mode == 0:
-            if len(straight_2d_paths_list) > 0:
-                nonempty_path_groups = filter(lambda x: x is not None, straight_2d_paths_list)
-                biggest_path_group_size = max(len(path_group) for path_group in nonempty_path_groups)
-                max_size = max(0, biggest_path_group_size - 1)
-            else:
-                max_size = 0
-        elif self.path_display_mode == 1:
-            max_size = max(0, len(curved_2d_paths_list) - 1)
-        """
-        elif self.path_display_mode == 2:
-            max_size = max(0, len(curved_3d_paths_list) - 1)
-        elif self.path_display_mode == 3:
-            max_size = 0
-        """
-        self.selected_path = max(0, min(self.selected_path, max_size))

@@ -29,53 +29,28 @@ def gui_input_manager_start():
                 # of the object type (right click), or changing display mode
                 d_s = DASHBOARD_SIZE
                 dict1 = g_v.gui.input_type_dict
-                dict2 = g_v.gui.status_type_dict
                 dict3 = g_v.gui.mission_state_display_dict
                 # reversed dictionaries to check which buttons has what type or what status
                 input_type_dict_rev = {dict1[key]: key for key in dict1}
-                input_status_dict_rev = {dict2[key]: key for key in dict2}
                 mission_state_display_dict_rev = {dict3[key]: key for key in dict3}
 
                 def action_1():
-                    g_v.gui.selected_path -= 1
-                    g_v.gui.clamp_display_mode()
-
-                def action_2():
-                    g_v.gui.selected_path += 1
-                    g_v.gui.clamp_display_mode()
-
-                def action_3():
                     g_v.mp = g_v.sc.get_mission()
 
-                def action_4():
+                def action_2():
                     g_v.th.clear()
                     g_v.rf.fetch_plane_status()
 
-                def action_5():
-                    g_v.th.clear()
-
-                def action_6():
-                    g_v.mp.clear_all()
-
-                def action_7():
-                    g_v.ms.generate()
-                    g_v.mc.compute_path()
-                    g_v.rf.export_path(g_v.mc.chosen_path)
-
-                def action_8():
-                    g_v.ms.land()
-                    g_v.mc.compute_path()
-
                 # left click actions for buttons
                 left_button_actions = {
-                    "Path <- button": action_1,
-                    "Path -> button": action_2,
-                    "Reload button": action_3,
-                    "Clear button": action_6,
-                    "Reload 2 button": action_4,
-                    "Clear 2 button": action_5,
-                    "Generate button": action_7,
-                    "land button": action_8,
+                    "Reload button": action_1,
+                    "Clear button": g_v.mp.clear_all,
+                    "Reload 2 button": action_2,
+                    "Clear 2 button": g_v.th.clear,
+                    "Generate button": g_v.ms.generate,
+                    "Compute button": g_v.mc.compute_path,
+                    "Export button": g_v.mc.export_path,
+                    "land button": g_v.ms.land,
                     "ending mission button": g_v.rf.end_mission,
                     "drop authorization button": g_v.rf.authorize_airdrop
                 }
@@ -111,11 +86,6 @@ def gui_input_manager_start():
                                 # change input type if the button does that
                                 if key in input_type_dict_rev.keys():
                                     g_v.gui.input_type = input_type_dict_rev[key]
-                                    input_done = True
-                                # change status type if the button does that
-                                if key in input_status_dict_rev.keys():
-                                    g_v.gui.path_display_mode = input_status_dict_rev[key]
-                                    g_v.gui.clamp_display_mode()
                                     input_done = True
                                 # change mission state input type if there is one
                                 if key in mission_state_display_dict_rev.keys():

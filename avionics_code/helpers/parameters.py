@@ -11,9 +11,9 @@ MAP_REF = {
     "longitude": -76.428022
     }
 LANDING_LOITER_CENTER = {
-      "latitude": 38.1461944444444,
-      "longitude": -76.4237138888889,
-      "altitude": 100.0
+      "latitude": 38.14549760439824,
+      "longitude": -76.42362494930353,
+      "altitude": 120
     }
 WAYPOINT_ACCEPTANCE_DISTANCE = 200  # (ft) distance to consider a waypoint crossed
 MISSION_TIME_LENGTH = 1200  # (seconds) time for mission after which plane lands automatically
@@ -44,9 +44,9 @@ BIAS_OF_DISTANCE = 1  # bias of distance for computing path cost  when covering 
 OFF_AXIS_WEIGHT_OF_ANGLE = 1  # weight of angle for computing path cost when covering off axis searching
 
 # Path finding parameters
-PATHS_PER_WAYPOINTS = 1  # number of paths to find between each two waypoints
+PATHS_PER_WAYPOINTS = 6  # max number of paths to find between each two waypoints
 MAX_ATTEMPTS_PER_WAYPOINTS = 100  # max number of rounds of exploration to find paths between two waypoints
-VARIATIONS_FOR_PATH_BUILDING = 0  # max number of curved paths to get stitched during curving of straight paths
+BACK_TRACKING_DEPTH = 2  # max number of backtracking to be done behind a waypoint before it is marked as unreachable
 
 # Path logic parameters
 OBSTACLE_DISTANCE_FOR_VALID_PASS = 30  # (ft) Distance off from obstacles for path to be valid
@@ -55,7 +55,6 @@ BORDER_DISTANCE_FOR_VALID_PASS = 80  # (ft) Distance off from border for path to
 BORDER_DISTANCE_FOR_VALID_NODE = 100  # (ft) Distance from border vertices at which nodes are created
 NODE_MIN_DISTANCE = 10  # (ft) Distance between two nodes such that they are considered the same
 OBSTACLE_ORBIT_RATIO = 1.2  # factor that obstacle distance for pass is scaled by for minimum orbiting angle
-MIN_DEVIATION_FOR_ALTERNATIVE_PATH = 10  # (degrees) Angle between two straight path lines so they represent a new path
 
 # Plane parameters
 PREFERRED_TURN_RADIUS = 100  # (ft) preferred turning radius for plane

@@ -1,5 +1,4 @@
 from avionics_code.path import path_functions as p_f, path_objects as p_o
-from avionics_code.flight import flight_profile as f_p
 from avionics_code.helpers import global_variables as g_v, geometrical_functions as g_f
 from avionics_code.helpers import parameters as para
 
@@ -7,16 +6,16 @@ WAYPOINT_ACCEPTANCE_DISTANCE = para.WAYPOINT_ACCEPTANCE_DISTANCE
 OBSTACLE_DISTANCE_FOR_VALID_PASS = para.OBSTACLE_DISTANCE_FOR_VALID_PASS
 MISSION_TIME_LENGTH = para.MISSION_TIME_LENGTH
 
+
 class MissionControl:
     """stores computed path and manipulates it"""
 
     def __init__(self):
 
         # current path to be sent/that was sent to the plane
-        self.straight_2d_paths_list = None
-        self.curved_2d_paths_list = None
-
         self.chosen_path = None
+
+        self.exportable_chosen_path = None
 
     def refresh_mission_state(self):
         """Refreshes mission state by checking if a new waypoint was reached,
@@ -30,12 +29,12 @@ class MissionControl:
             print("\nTime ran out, starting landing...")
             g_v.ms.land()
             self.compute_path()
-            g_v.rf.export_path(self.chosen_path)
+            self.export_path()
 
         # update path if there is no path or plane deviated from original path
         if self.chosen_path is None or self.check_path_deviation():
             self.compute_path()
-            g_v.rf.export_path(self.chosen_path)
+            self.export_path()
 
     def check_path_deviation(self):
         """Check if path deviated from original computed path"""
@@ -83,10 +82,14 @@ class MissionControl:
         elif mission_index == 3:
             g_v.rf.take_off_axis_picture()
 
+    def export_path(self):
+        """exports the currently stored path"""
+
+        g_v.rf.export_path(self.exportable_chosen_path)
+
     def compute_path(self):
         """Computes path to be sent to the plane
         based on the mission state"""
-
         print("\nComputing path...")
 
         # get info for path computation
@@ -116,33 +119,14 @@ class MissionControl:
                 # get new plane position
                 plane_pos = g_f.add_vectors(vec_scaled, plane_pos)
 
-        # Check if there are no points to fly to
-        if len(waypoint_list) == 0:
-            print("Error, no waypoints to fly to")
-            print("Called ending mission")
-            g_v.rf.end_mission()
+        w_l = waypoint_list
+        self.chosen_path, max_depth = self.smart_path_finder(plane_pos, plane_z, w_l, w_l, profile)
+
+        if not self.chosen_path:
             return
 
-        # compute 2d path list
-        plane_obj = f_p.FlightObject(plane_pos, plane_z)
-        self.straight_2d_paths_list = p_f.straight_2d_path_finder(plane_obj, waypoint_list, profile)
-
-        # check if any two waypoints could not be connected
-        for index, path_group in enumerate(self.straight_2d_paths_list):
-            if path_group is None:
-                print(f'Error: full mission waypoints {index} and {index+1} '
-                      f'could not be linked with a straight line path')
-                print(f'Deleting mission waypoint {index+1} from mission state and retrying')
-                del g_v.ms.waypoint_list[index]
-                print(len(g_v.ms.waypoint_list))
-                self.compute_path()
-                return
-
-        self.curved_2d_paths_list = p_f.curving_2d(self.straight_2d_paths_list, profile)
-
-        curved_path = self.curved_2d_paths_list[0]
         waypoint_list_new = list()
-        for way in curved_path.waypoint_list:
+        for way in self.chosen_path.waypoint_list:
 
             pre_turn_waypoint = way.pre_turn_waypoint
             if pre_turn_waypoint is not None:
@@ -154,6 +138,36 @@ class MissionControl:
             if post_turn_waypoint is not None:
                 waypoint_list_new.append(post_turn_waypoint)
 
-        self.chosen_path = p_o.Path(waypoint_list_new)
+        self.exportable_chosen_path = p_o.Path(waypoint_list_new)
 
         print("Path computed.")
+
+    def smart_path_finder(self, plane_pos, plane_z, original_list, sliced_list, profile):
+        """finds recursively a path through the waypoints while deleting
+        points that it could not reach """
+
+        print("Attempting path finding...")
+
+        # Check if there are no points to fly to
+        if len(sliced_list) == 0:
+            print("Error, no waypoints to fly to")
+            print("Called ending mission")
+            g_v.rf.end_mission()
+            return False, False
+
+        start_point = p_o.Waypoint(sliced_list[0].mission_index, plane_pos, plane_z)
+        path_to_now = p_o.Path([start_point])
+
+        found_path, max_depth = p_f.recursive_path_search(path_to_now, sliced_list, profile, 0)
+
+        # check if some waypoint could not be reached
+        if found_path is None:
+            original_index = original_list.index(sliced_list[max_depth])
+            print(f'Error: full mission waypoints {original_index} could not be reached')
+            print(f'it will be ignored for this path computation')
+            new_list = sliced_list[:max_depth] + sliced_list[1+max_depth:]
+            print(f'remaining waypoints: {len(new_list)}')
+            return self.smart_path_finder(plane_pos, plane_z, original_list, new_list, profile)
+        else:
+            print("Path finding complete.")
+            return found_path, max_depth

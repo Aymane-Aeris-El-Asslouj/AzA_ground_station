@@ -51,35 +51,31 @@ def draw_path_points_straight(path, color):
         pygame.draw.circle(g_v.gui.screen, color, vertex_dash_1, WAYPOINT_SIZE)
 
 
-def draw_curved_path(curved_path):
-    """draw edges of curved path including turn waypoints"""
+def draw_curved_edge(way_1, way_2, color):
+    """draw edge between two waypoints along with turning points"""
 
-    edges_to_draw = curved_path.compute_simple_edges()
+    # Get previous vertex or its off shoot waypoint if it exists
+    vertex_1 = g_v.gui.dashboard_projection(way_1)
+    pygame.draw.circle(g_v.gui.screen, (255, 255, 0), vertex_1, WAYPOINT_SIZE)
+    # Get next vertex
+    vertex_2 = g_v.gui.dashboard_projection(way_2)
+    pygame.draw.circle(g_v.gui.screen, (255, 255, 0), vertex_2, WAYPOINT_SIZE)
 
-    for edge in edges_to_draw:
+    # turn waypoint after vertex 1
+    if way_1.post_turn_waypoint is not None:
+        after_turn = g_v.gui.dashboard_projection(way_1.post_turn_waypoint)
+        pygame.draw.circle(g_v.gui.screen, (255, 105, 180), after_turn, WAYPOINT_SIZE)
+        pygame.draw.line(g_v.gui.screen, (255, 105, 180), vertex_1, after_turn)
+        vertex_1 = after_turn
 
-        # Get previous vertex or its off shoot waypoint if it exists
-        vertex_1 = g_v.gui.dashboard_projection(edge[0])
-        pygame.draw.circle(g_v.gui.screen, (255, 255, 0), vertex_1, WAYPOINT_SIZE)
-        # Get next vertex
-        vertex_2 = g_v.gui.dashboard_projection(edge[1])
-        pygame.draw.circle(g_v.gui.screen, (255, 255, 0), vertex_2, WAYPOINT_SIZE)
+    # turn waypoint before vertex 2
+    if way_2.pre_turn_waypoint is not None:
+        before_turn = g_v.gui.dashboard_projection(way_2.pre_turn_waypoint)
+        pygame.draw.circle(g_v.gui.screen, (255, 105, 180), before_turn, WAYPOINT_SIZE)
+        pygame.draw.line(g_v.gui.screen, (255, 105, 180), before_turn, vertex_2)
+        vertex_2 = before_turn
 
-        # turn waypoint after vertex 1
-        if edge[0].post_turn_waypoint is not None:
-            after_turn = g_v.gui.dashboard_projection(edge[0].post_turn_waypoint)
-            pygame.draw.circle(g_v.gui.screen, (255, 105, 180), after_turn, WAYPOINT_SIZE)
-            pygame.draw.line(g_v.gui.screen, (255, 105, 180), vertex_1, after_turn)
-            vertex_1 = after_turn
-
-        # turn waypoint before vertex 2
-        if edge[1].pre_turn_waypoint is not None:
-            before_turn = g_v.gui.dashboard_projection(edge[1].pre_turn_waypoint)
-            pygame.draw.circle(g_v.gui.screen, (255, 105, 180), before_turn, WAYPOINT_SIZE)
-            pygame.draw.line(g_v.gui.screen, (255, 105, 180), before_turn, vertex_2)
-            vertex_2 = before_turn
-
-        pygame.draw.line(g_v.gui.screen, (255, 255, 0), vertex_1, vertex_2)
+    pygame.draw.line(g_v.gui.screen, color, vertex_1, vertex_2, width=2)
 
 
 def draw_arrow(surf, object_origin, map_vector, color):

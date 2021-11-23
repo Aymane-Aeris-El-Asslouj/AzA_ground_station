@@ -63,11 +63,15 @@ class RFComs:
 
     def export_path(self, path):
         """makes path into plan and exports it to the pixhawk"""
+
+        print("\nExporting path")
         path = path
         border = g_v.mp.border
         center = MAP_REF
 
         boundary = [vertex.pos for vertex in border.vertices]
-        waypoints = [way.pos for way in path.waypoint_list]
+        waypoints = [(way.pos, way.z) for way in path.waypoint_list]
 
         g_p.generate_plan(boundary, waypoints, center)
+
+        print("Path exported.")

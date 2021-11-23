@@ -386,7 +386,7 @@ def seg_to_seg_with_safety(point_1, point_2, point_3, point_4, safety_distance):
     elif float_eq_2d(point_3, point_4) and (not float_eq_2d(point_1, point_2)):
         return seg_to_disk_intersection(point_1, point_2, point_3, s_d)
     # if they do form lines,
-    # check if the seg 1intersect the pill safety zone of the seg 2
+    # check if the seg 1 intersect the pill safety zone of the seg 2
     else:
         # check if seg (1-2) does not intersect with circles around point 3 and 4
         if seg_to_disk_intersection(point_1, point_2, point_3, s_d):
@@ -447,7 +447,7 @@ def is_crossing_over_edge(point_1, point_2, crossing_point, edge_point):
         else:
             return new_point_2[1] / new_point_2[0] < new_point_1[1] / new_point_1[0]
     else:
-        return True
+        return False
 
 
 def tangent_points(point, circle_cen, circle_rad):
@@ -479,24 +479,6 @@ def tangent_points(point, circle_cen, circle_rad):
     way_to_node_2 = add_vectors(axis_scaled, s_vector_2)
     # add vectors to waypoint location type
     return add_vectors(point, way_to_node_1), add_vectors(point, way_to_node_2)
-
-
-def find_arc_angles_dash(point_1, point_mid, point_2, point_center):
-    """find angles of arc from point mid to point 2 coming from
-    point 1 around point center"""
-    
-    m_center = mirror_vector_y(point_center)
-    m_point_1 = mirror_vector_y(point_1)
-    m_point_mid = mirror_vector_y(point_mid)
-    m_point_2 = mirror_vector_y(point_2)
-    # find which angle to start from to get the right arc
-    a_1 = find_angle((1, 0), sub_vectors(m_point_1, m_center))
-    a_mid = find_angle((1, 0), sub_vectors(m_point_mid, m_center))
-    a_2 = find_angle((1, 0), sub_vectors(m_point_2, m_center))
-    if -3.14 < a_mid - a_1 < 0 or 3.14 < a_mid - a_1 < 6.30:
-        return a_2, a_mid
-    else:
-        return a_mid, a_2
 
 
 def point_inside_polygon(point, polygon):

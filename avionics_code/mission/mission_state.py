@@ -1,5 +1,4 @@
 import math
-import sys
 
 from avionics_code.path import path_objects as p_o, coverage_finder as c_f
 from avionics_code.helpers import global_variables as g_v, parameters as para, geometrical_functions as g_f
@@ -12,6 +11,7 @@ AIR_DROP_ALTITUDE = para.AIR_DROP_ALTITUDE
 IMAGING_ALTITUDE = para.IMAGING_ALTITUDE
 OFF_AXIS_IMAGING_ALTITUDE = para.OFF_AXIS_IMAGING_ALTITUDE
 LANDING_LOITER_CENTER = para.LANDING_LOITER_CENTER
+
 
 class MissionState:
     """stores generated true mission and its competition status"""
@@ -82,6 +82,7 @@ class MissionState:
         landing_loiter_waypoint = p_o.Waypoint(5, loiter_tuple, loiter_altitude, is_mission=True)
         if landing_loiter_waypoint.is_valid(g_v.mp):
             self.waypoint_list.append(landing_loiter_waypoint)
+            g_v.mc.compute_path()
         else:
             print("Error: landing loiter is not valid")
             print("Called ending mission")

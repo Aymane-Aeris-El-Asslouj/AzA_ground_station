@@ -1,6 +1,5 @@
 import math
 import avionics_code.helpers.geometrical_functions as g_f
-import avionics_code.path.path_functions as p_f
 import avionics_code.helpers.parameters as para
 
 OBSTACLE_DISTANCE_FOR_VALID_PASS = para.OBSTACLE_DISTANCE_FOR_VALID_PASS
@@ -9,8 +8,8 @@ BORDER_DISTANCE_FOR_VALID_PASS = para.BORDER_DISTANCE_FOR_VALID_PASS
 BORDER_DISTANCE_FOR_VALID_NODE = para.BORDER_DISTANCE_FOR_VALID_NODE
 NODE_MIN_DISTANCE = para.NODE_MIN_DISTANCE
 OBSTACLE_ORBIT_RATIO = para.OBSTACLE_ORBIT_RATIO
-MIN_DEVIATION_FOR_ALTERNATIVE_PATH = math.radians(para.MIN_DEVIATION_FOR_ALTERNATIVE_PATH)
 PREFERRED_TURN_RADIUS = para.PREFERRED_TURN_RADIUS
+MAX_CLIMBING_RATIO = para.MAX_CLIMBING_RATIO
 
 
 class MapObject:
@@ -31,15 +30,6 @@ class MapArea:
 
     def __init__(self, vertices):
         self.vertices = vertices
-        
-    def compute_simple_edges(self):
-        """Returns list of edges of the border made with two vertices"""
-
-        edges_list = list()
-        if len(self.vertices) > 1:
-            for i in range(len(self.vertices)):
-                edges_list.append((self.vertices[i - 1], self.vertices[i]))
-        return edges_list
 
     def polygon(self):
         """Returns a polygon of the positions of the vertices"""
@@ -62,11 +52,11 @@ class Obstacle(MapObject):
         super().__init__(position_tuple)
         self.r = r
 
-    def create_tangent_nodes(self, waypoint_1):
+    def create_tangent_nodes(self, waypoint_1, mission_index):
         """Creates tangent nodes from the given waypoint
         toward the obstacle to allow dodging it"""
 
-        m_i = waypoint_1.mission_index
+        m_i = mission_index
 
         distance_to_waypoint = g_f.distance_2d(waypoint_1.pos, self.pos)
         # Check if Waypoint is the same as center of obstacle
@@ -290,8 +280,7 @@ class Waypoint(MapObject):
             last_to_current = g_f.sub_vectors(self.pos, waypoint_1.pos)
             current_to_next = g_f.sub_vectors(waypoint_2.pos, self.pos)
             if g_f.distinct_points_3(last_to_current, current_to_next, (0, 0)):
-                DIV = MIN_DEVIATION_FOR_ALTERNATIVE_PATH
-                return abs(g_f.find_angle(last_to_current, current_to_next)) < DIV
+                return True
             else:
                 return False
         else:
@@ -305,6 +294,8 @@ class Waypoint(MapObject):
         node_1 = way_1.pos
         node_2 = self.pos
         node_3 = way_2.pos
+
+        # if the points are not distinct, there is not point in curving
         if not g_f.distinct_points_3(node_1, node_2, node_3):
             return None
 
@@ -358,7 +349,7 @@ class Waypoint(MapObject):
         else:
             return False
 
-    def turn_after(self, way_1, way_2, profile):
+    def turn_after(self, way_1, way_2, profile, no_next_way):
         """adds a turn waypoint after itself to make sure the plane
         goes through it"""
 
@@ -367,26 +358,35 @@ class Waypoint(MapObject):
         # get all three points involved in the turn
         node_1 = way_1.pos
         node_2 = self.pos
-        node_3 = way_2.pos
+        node_3 = None
+        if not no_next_way:
+            node_3 = way_2.pos
 
-        if not g_f.distinct_points_3(node_1, node_2, node_3):
-            return None
+        # if the points are not distinct, there is not point in curving
+        if not no_next_way:
+            if not g_f.distinct_points_3(node_1, node_2, node_3):
+                return None
+        else:
+            if not g_f.distinct_points_2(node_1, node_2):
+                return None
 
         # find a point after node 2 that is a turn radius away from it
         dis = g_f.distance_2d(node_1, node_2) + P_R
         turn_pos = g_f.homothety_unit(node_2, node_1, dis)
 
         TURN_NUM = 50
-        node_1_to_2 = g_f.sub_vectors(node_2, node_1)
-        node_2_to_3 = g_f.sub_vectors(node_3, node_2)
-        base_angle = g_f.find_angle(node_1_to_2, node_2_to_3)
 
         for turn_index in range(TURN_NUM):
-            turn_pos = g_f.rotate_vector_with_center(turn_pos, node_2, base_angle/TURN_NUM)
+            turn_pos = g_f.rotate_vector_with_center(turn_pos, node_2, math.pi/TURN_NUM)
 
-            # check the turn waypoint is valid
             turn_w = Waypoint(self.mission_index, turn_pos)
-            if turn_w.is_connectable_to(self, profile) and turn_w.is_connectable_to(way_2, profile):
+
+            if not no_next_way:
+                valid = turn_w.is_connectable_to(way_2, profile)
+            else:
+                valid = True
+
+            if turn_w.is_connectable_to(self, profile) and valid:
                 if turn_index == 0:
                     self.post_turn_waypoint = turn_w
                     return True
@@ -397,132 +397,134 @@ class Waypoint(MapObject):
         # no turning points could be made
         return False
 
+    def curve(self, prev_way, next_way, profile, no_next_way=False):
+        """adds turning waypoints to make the plane pass
+        through the waypoint if needed"""
+
+        # if mission point, make waypoint to go through it
+        if self.is_mission:
+            # check if part of waypoint mission or airdrop
+            if self.mission_index == 0 or self.mission_index == 1:
+
+                # get rid of any previous turning points
+                self.pre_turn_waypoint = None
+                self.post_turn_waypoint = None
+
+                if prev_way.post_turn_waypoint is not None:
+                    last_waypoint = prev_way.post_turn_waypoint
+                else:
+                    last_waypoint = prev_way
+
+                curved_worked = self.turn_after(last_waypoint, next_way, profile, no_next_way)
+
+                # return if there was a problem with the curving
+                if curved_worked is not None:
+                    if not curved_worked:
+                        return False
+        return True
+
 
 class Path:
     """path made from multiple waypoints"""
 
     def __init__(self, waypoint_list):
         self.waypoint_list = waypoint_list
-        self.simple_distance_2d = None
 
-    def compute_simple_edges(self):
-        """Returns list of edges of the path without turn waypoints"""
+    def distance_2d(self):
+        """computes 2D distance of the path without
+        considering turn waypoints"""
 
-        edges_list = list()
+        distance = 0
         if len(self.waypoint_list) > 1:
             for i in range(len(self.waypoint_list) - 1):
-                edges_list.append((self.waypoint_list[i], self.waypoint_list[i + 1]))
-        return edges_list
+                distance += self.waypoint_list[i].distance_2d_to(self.waypoint_list[i + 1])
+        return distance
 
-    def compute_simple_distance_2d(self):
-        """computes 2D distance of the path without
-        considering altitude or turn waypoints"""
+    def distance_2d_with_turn_waypoint(self):
+        """computes 2D distance of the path while
+        considering turn waypoints"""
 
-        return sum(edge[0].distance_2d_to(edge[1]) for edge in self.compute_simple_edges())
-
-    def compute_true_distance_2d(self):
-        """computes 2D distance of the path with turn waypoints"""
-
-        return sum(edge[0].distance_2d_to(edge[1]) for edge in self.compute_simple_edges())
-
-    def distance_2d_update(self):
-        """updates 2D distance"""
-
-        self.simple_distance_2d = self.compute_simple_distance_2d()
+        distance = 0
+        if len(self.waypoint_list) > 1:
+            for i in range(len(self.waypoint_list) - 1):
+                way_1 = self.waypoint_list[i]
+                if way_1.post_turn_waypoint is not None:
+                    distance += way_1.distance_2d_to(way_1.post_turn_waypoint)
+                    way_1 = way_1.post_turn_waypoint
+                way_2 = self.waypoint_list[i + 1]
+                if way_2.pre_turn_waypoint is not None:
+                    distance += way_2.distance_2d_to(way_2.pre_turn_waypoint)
+                    way_2 = way_2.pre_turn_waypoint
+                distance += way_1.distance_2d_to(way_2)
+        return distance
 
     def path_distance_to_waypoint(self, next_waypoint):
         """find total distance of path plus an extra waypoint"""
 
         last_node = self.waypoint_list[- 1]
-        self.distance_2d_update()
-        return self.simple_distance_2d + g_f.distance_2d(last_node.pos, next_waypoint.pos)
+        return self.distance_2d() + g_f.distance_2d(last_node.pos, next_waypoint.pos)
 
     def curve(self, profile):
         """Curve path by adding turn waypoints"""
 
-        if len(self.waypoint_list) > 2:
-            for way_index in range(1, len(self.waypoint_list) - 1):
+        # go over all points except the last one
+        for way_index in range(1, len(self.waypoint_list)):
 
-                prev_way = self.waypoint_list[way_index - 1]
-                cur_way = self.waypoint_list[way_index]
+            # for the first waypoint, the last node given
+            # is the previous waypoint
+            prev_way = self.waypoint_list[way_index - 1]
+            cur_way = self.waypoint_list[way_index]
+
+            if way_index == len(self.waypoint_list) - 1:
+                # if there was a problem with curving, return false
+                if not cur_way.curve(prev_way, None, profile, no_next_way=True):
+                    return False
+            else:
                 next_way = self.waypoint_list[way_index + 1]
+                # if there was a problem with curving, return false
+                if not cur_way.curve(prev_way, next_way, profile):
+                    return False
 
-                if prev_way.post_turn_waypoint is not None:
-                    prev_way = prev_way.post_turn_waypoint
-
-                # if mission point, make waypoint to go through it
-                if cur_way.is_mission:
-                    cur_way.turn_after(prev_way, next_way, profile)
-
-    def is_valid(self, profile_1):
-        """Check if path is valid including turn waypoints"""
-
-        for w_index, waypoint_i in enumerate(self.waypoint_list):
-            if 0 < w_index < len(self.waypoint_list) - 1:
-                c_p = self.waypoint_list[w_index-1]
-                if c_p.off_waypoint is not None:
-                    c_p = c_p.off_waypoint
-                c_w = waypoint_i
-                if c_w.turn_waypoint is not None:
-                    c_p = c_w.turn_waypoint
-                next_waypoint = self.waypoint_list[w_index+1]
-                c_off_w = c_w.off_waypoint
-                c_off_next = next_waypoint.off_waypoint
-                al_w = next_waypoint.turn_waypoint
-                if c_off_w is not None:
-                    turn_cen = c_off_w.turn_waypoint
-                    if c_off_w.pos != (None, None):
-                        if not c_w.is_arc_connectable_to(c_p, c_off_w, turn_cen, profile_1):
-                            return False
-                        c_w = c_off_w
-                    else:
-                        center = g_f.center_2d(c_w.pos, next_waypoint.pos)
-                        Danger_area = Danger_zone(center, 2*PREFERRED_TURN_RADIUS)
-                        if not Danger_area.is_free(profile_1):
-                            return False
-
-                if al_w is None:
-                    if not c_w.is_connectable_to(next_waypoint, profile_1):
-                        return False
-                else:
-                    turn_cen_2 = c_off_next.turn_waypoint
-                    if not c_w.is_connectable_to(al_w, profile_1):
-                        return False
-                    if not al_w.is_arc_connectable_to(c_w, next_waypoint, turn_cen_2, profile_1):
-                        return False
+        # return that the curving worked
         return True
 
+    def altitude_set(self):
+        """add altitude to waypoints of path"""
 
-class Danger_zone:
-    """Area where the flight is hard to predict"""
+        z_0 = self.waypoint_list[0].z
+        z_f = self.waypoint_list[-1].z
 
-    def __init__(self, center, radius):
-        self.center = center
-        self.radius = radius
+        delta_z = z_f - z_0
+        distance_crossed = self.distance_2d_with_turn_waypoint()
 
-    def is_free(self, profile_1):
-        """Check if the area has no obstacles or borders in it"""
-
-        # Extract map info
-        obstacles = profile_1.obstacles
-        border_1 = profile_1.border
-
-        # check if there is a collision with some obstacle
-        for obstacle_i in obstacles:
-
-            # check if the seg connecting the two waypoints intersects with the obstacle
-            center = obstacle_i.pos
-            if g_f.circle_to_circle_intersection(self.center, self.radius, center, obstacle_i.r):
+        if g_f.float_eq(distance_crossed, 0):
+            if g_f.float_eq(delta_z, 0):
+                climb_ratio = 0
+            else:
                 return False
+        else:
+            climb_ratio = delta_z/distance_crossed
 
-        # check if there is a collision with some border line
-        for vertex_index in range(len(border_1.vertices)):
-            vertex_1 = border_1.vertices[vertex_index]
-            vertex_2 = border_1.vertices[(vertex_index + 1) % len(border_1.vertices)]
-            # check if the seg connecting the two waypoints intersects with the border line
-            v_node_1 = vertex_1.pos
-            v_node_2 = vertex_2.pos
-            if g_f.seg_to_disk_intersection(v_node_1, v_node_2, self.center, self.radius):
-                return False
+        if abs(climb_ratio) > MAX_CLIMBING_RATIO:
+            return False
 
+        # go over all points except the first and last one
+        for way_index in range(1, len(self.waypoint_list)):
+
+            # make the plane climb between the two waypoints at the climb ratio
+            prev_way = self.waypoint_list[way_index - 1]
+            prev_way_post = prev_way.post_turn_waypoint
+            if prev_way_post is not None:
+                prev_way_post.z = prev_way.z + climb_ratio * prev_way.distance_2d_to(prev_way_post)
+                prev_way = prev_way_post
+
+            cur_way = self.waypoint_list[way_index]
+            cur_way_pre = cur_way.pre_turn_waypoint
+            if cur_way_pre is not None:
+                cur_way_pre.z = prev_way.z + climb_ratio * prev_way.distance_2d_to(cur_way_pre)
+                cur_way.z = cur_way_pre.z + climb_ratio * cur_way_pre.distance_2d_to(cur_way)
+            else:
+                cur_way.z = prev_way.z + climb_ratio * prev_way.distance_2d_to(cur_way)
+
+        # return that the curving worked
         return True

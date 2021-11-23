@@ -19,14 +19,14 @@ landing_item = {
                 "altitudesAreRelative": True,
                 "complexItemType": "fwLandingPattern",
                 "landCoordinate": [
-                    38.14483913196416,
-                    -76.42802208496558,
+                    38.1449043144047,
+                    -76.42744191311141,
                     0
                 ],
-                "loiterClockwise": True,
+                "loiterClockwise": False,
                 "loiterCoordinate": [
-                    38.14634047568596,
-                    -76.42410175157057,
+                    38.14549760439824,
+                    -76.42362494930353,
                     40
                 ],
                 "loiterRadius": 75,
@@ -135,14 +135,14 @@ sample_plan = {
                 "altitudesAreRelative": True,
                 "complexItemType": "fwLandingPattern",
                 "landCoordinate": [
-                    38.14483913196416,
-                    -76.42802208496558,
+                    38.1449043144047,
+                    -76.42744191311141,
                     0
                 ],
-                "loiterClockwise": True,
+                "loiterClockwise": False,
                 "loiterCoordinate": [
-                    38.14634047568596,
-                    -76.42410175157057,
+                    38.14549760439824,
+                    -76.42362494930353,
                     40
                 ],
                 "loiterRadius": 75,
@@ -198,8 +198,9 @@ def generate_plan(boundary, waypoints, center):
     item = copy.copy(sample_item)
     item['command'] = 22 if i == 0 else 16
     item['doJumpId'] = i + 1
-    (x, y) = get_latlon(xc + waypoints[i][0] / 3.281, yc + waypoints[i][1] / 3.281, zc, dc)
-    item['params'] = [0, 0.2, 0.2, None, x, y, 50]
+    (x, y) = get_latlon(xc + waypoints[i][0][0] / 3.281, yc + waypoints[i][0][1] / 3.281, zc, dc)
+    item['params'] = [0, 0.2, 0.2, None, x, y, waypoints[i][1] / 3.281]
+    item['Altitude'] = waypoints[i][1] / 3.281
     wayp.append(item)
   wayp.append(landing_item)
   plan['mission']['items'] = wayp
