@@ -2,7 +2,8 @@ from avionics_code.path import path_functions as p_f, path_objects as p_o
 from avionics_code.helpers import global_variables as g_v, geometrical_functions as g_f
 from avionics_code.helpers import parameters as para
 
-WAYPOINT_ACCEPTANCE_DISTANCE = para.WAYPOINT_ACCEPTANCE_DISTANCE
+WAYPOINT_ACCEPTANCE_DISTANCE_1 = para.WAYPOINT_ACCEPTANCE_DISTANCE_1
+WAYPOINT_ACCEPTANCE_DISTANCE_2 = para.WAYPOINT_ACCEPTANCE_DISTANCE_2
 OBSTACLE_DISTANCE_FOR_VALID_PASS = para.OBSTACLE_DISTANCE_FOR_VALID_PASS
 MISSION_TIME_LENGTH = para.MISSION_TIME_LENGTH
 
@@ -16,6 +17,8 @@ class MissionControl:
         self.chosen_path = None
 
         self.exportable_chosen_path = None
+
+        self.status = 0
 
     def refresh_mission_state(self):
         """Refreshes mission state by checking if a new waypoint was reached,
@@ -65,11 +68,15 @@ class MissionControl:
             return
 
         # check if the next waypoint was reached
-        if g_f.distance_3d(plane_3d_pos, next_waypoint_3d_pos) < WAYPOINT_ACCEPTANCE_DISTANCE:
-            print("\nWaypoint reached!")
+        if next_waypoint.mission_index == 0 or next_waypoint.mission_index == 1:
+            acceptance_radius = WAYPOINT_ACCEPTANCE_DISTANCE_1
+        else:
+            acceptance_radius = WAYPOINT_ACCEPTANCE_DISTANCE_2
+        if g_f.distance_3d(plane_3d_pos, next_waypoint_3d_pos) < acceptance_radius:
             # do what needs to be done at the mission waypoint (like taking a picture)
             self.mission_action(next_waypoint.mission_index)
             del g_v.ms.waypoint_list[0]
+            g_v.gui.update_mission()
 
     @staticmethod
     def mission_action(mission_index):
@@ -90,7 +97,8 @@ class MissionControl:
     def compute_path(self):
         """Computes path to be sent to the plane
         based on the mission state"""
-        print("\nComputing path...")
+
+        self.status = 1
 
         # get info for path computation
         plane_obj = g_v.th.last_flight_profile().plane_obj
@@ -140,7 +148,9 @@ class MissionControl:
 
         self.exportable_chosen_path = p_o.Path(waypoint_list_new)
 
-        print("Path computed.")
+        self.status = 2
+        g_v.gui.update_system_status()
+        g_v.gui.update_path()
 
     def smart_path_finder(self, plane_pos, plane_z, original_list, sliced_list, profile):
         """finds recursively a path through the waypoints while deleting

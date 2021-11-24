@@ -11,7 +11,7 @@ def clamp(v):
     return int(v)
 
 
-class rgb_rotate(object):
+class RGBRotate(object):
     """shifter that changes the hue of a color"""
 
     def __init__(self):

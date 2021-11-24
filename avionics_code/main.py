@@ -1,15 +1,27 @@
 from avionics_code.communications import rf_communications as rf_c, server_communications as s_c
-from avionics_code.mission import mission_control as m_c, mission_state as m_s, mission_profile as m_p
-from avionics_code.gui import graphical_user_interface as g_u_i, gui_input_manager as g_i_m
+from avionics_code.mission import mission_control as m_c, mission_state as m_s
+from avionics_code.mission import mission_profile as m_p
+from avionics_code.gui import graphical_user_interface as g_u_i
 import avionics_code.helpers.global_variables as g_v
 from avionics_code.flight import flight_profile as f_p
 
 import time
+import asyncio
 
-def launch_avionics():
+
+def main():
     """Launches the Avionics code"""
 
     g_v.init_time = time.time()
+
+    """Graphical User Interface object that allows to visualize
+    the progress of the mission along with adding info to the
+    mission profile for testing purposes, or issuing drop authorizations
+    and emergency landing orders for real missions"""
+    g_v.gui = g_u_i.GUI()
+    g_v.gui.activate()
+    g_v.gui.update_u_i()
+    g_v.gui.update_system_status()
 
     """This Server communications object handles communication with
     the auvsi suas server. It downloads the mission info to make a
@@ -17,9 +29,6 @@ def launch_avionics():
     it must also upload deliverables of the Computer vision team
     and download other planes' telemetry"""
     g_v.sc = s_c.ServerComs()
-
-    """Connect to the interop server"""
-    g_v.sc.connect()
 
     """This RF communications object handles communication with
     the plane's Pixhawk and ground vehicle. It downloads plane
@@ -30,13 +39,10 @@ def launch_avionics():
     if telemetry is not received."""
     g_v.rf = rf_c.RFComs()
 
-    """Connect to the Pixhawk"""
-    g_v.rf.connect()
-
     """This Mission profile object stores all the mission info
     provided by the competition's server (border, waypoint,
     obstacles, etc)."""
-    g_v.mp = g_v.sc.get_mission()
+    g_v.mp = m_p.MissionProfile()
 
     """Mission state object storing the waypoints that the plane needs
     to go through in order to accomplish the entire mission (mission
@@ -45,11 +51,6 @@ def launch_avionics():
     landing functions in case of timeout or emergency that change
     the plan to landing"""
     g_v.ms = m_s.MissionState()
-
-    """Generate complete set of waypoints to accomplish all parts
-    of the mission (mission waypoints, UGV drop, map scouting, etc)
-    based on the mission profile and the current status of the plane"""
-    g_v.ms.generate()
 
     """telemetry history list that keeps track of all the telemetry packages
     that are received from the pixhawk or plan"""
@@ -60,23 +61,21 @@ def launch_avionics():
     conditions, along with timeout landing"""
     g_v.mc = m_c.MissionControl()
 
-    """Download once the info of the plane to create an initial
-    flight plan and add it to the telemetry history list"""
-    g_v.rf.fetch_plane_status()
-
-    """Starts the loop of RF comms that keeps fetching for plane
-    status info and calling server comms' telemetry upload and
-    mission control's mission state refresh"""
-    #g_v.rf.loop_fetch_plane_status()
-
-    """Graphical User Interface object that allows to visualize
-    the progress of the mission along with adding info to the
-    mission profile for testing purposes, or issuing drop authorizations
-    and emergency landing orders for real missions"""
-    g_v.gui = g_u_i.GUI()
-    g_v.gui.display_update()
-    g_i_m.gui_input_manager_start()
+    # connect to server
+    g_v.sc.connect()
+    # connect to pixhawk
+    asyncio.get_event_loop().run_until_complete(g_v.rf.connect())
+    # get mission from server
+    g_v.sc.get_mission()
+    g_v.gui.update_map()
+    # create full mission in mission state
+    g_v.ms.generate()
+    # start async thread for getting plane status
+    asyncio.ensure_future(g_v.rf.fetch_plane_status_loop())
+    asyncio.get_event_loop().run_forever()
 
 
 if __name__ == '__main__':
-    launch_avionics()
+    # Start the main function
+    main()
+

@@ -1,10 +1,14 @@
 from avionics_code.path import path_objects as p_o
 from avionics_code.helpers import global_variables as g_v
 
+
 class MissionProfile:
     """stores all mission info received from the server"""
 
     def __init__(self):
+
+        self.status = 0
+
         # lost coms (MapObject)
         self.lost_comms_object = None
 
@@ -42,54 +46,71 @@ class MissionProfile:
 
     def add_obstacle(self, obstacle_tuple):
         self.obstacles.append(p_o.Obstacle(obstacle_tuple[0], obstacle_tuple[1]))
+        g_v.gui.update_map()
 
     def clear_obstacles(self):
         self.obstacles.clear()
+        g_v.gui.update_map()
 
     def delete_obstacle(self, i):
         del self.obstacles[i]
+        g_v.gui.update_map()
 
     def add_border_vertex(self, i, vertex_tuple):
         self.border.vertices.insert(i, p_o.Vertex(vertex_tuple))
+        g_v.gui.update_map()
 
     def clear_border(self):
         self.border.vertices.clear()
+        g_v.gui.update_map()
 
     def delete_border_vertex(self, i):
         del self.border.vertices[i]
+        g_v.gui.update_map()
 
     def add_search_vertex(self, i, vertex_tuple):
         self.search_area.vertices.insert(i, p_o.Vertex(vertex_tuple))
+        g_v.gui.update_map()
 
     def clear_search(self):
         self.search_area.vertices.clear()
+        g_v.gui.update_map()
 
     def delete_search_vertex(self, i):
         del self.search_area.vertices[i]
+        g_v.gui.update_map()
 
     def add_waypoint(self, i, waypoint_tuple, altitude):
         self.mission_waypoints.insert(i, p_o.Waypoint(0, waypoint_tuple, altitude, is_mission=True))
+        g_v.gui.update_map()
 
     def clear_waypoints(self):
         self.mission_waypoints.clear()
+        g_v.gui.update_map()
 
     def delete_waypoint(self, i):
         del self.mission_waypoints[i]
+        g_v.gui.update_map()
 
     def set_airdrop(self, pos):
         self.airdrop_object.pos = pos
+        g_v.gui.update_map()
 
     def set_airdrop_goal(self, pos):
         self.ugv_goal_object.pos = pos
+        g_v.gui.update_map()
 
     def set_lostcomms(self, pos):
         self.lost_comms_object.pos = pos
+        g_v.gui.update_map()
 
     def set_offaxis_obj(self, pos):
         self.off_axis_object.pos = pos
+        g_v.gui.update_map()
 
     def set_emergent_obj(self, pos):
         self.emergent_object.pos = pos
+        g_v.gui.update_map()
 
     def set_mapping_area(self, pos1, pos2):
         # determine center of two points
@@ -100,24 +121,31 @@ class MissionProfile:
         pairs = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
         map_list = [p_o.Vertex((c_x+pair[0]*height*(8/9), c_y+pair[1]*height/2)) for pair in pairs]
         self.mapping_area.vertices = map_list
+        g_v.gui.update_map()
 
     def clear_lostcomms(self):
         self.set_lostcomms((0, 0))
+        g_v.gui.update_map()
 
     def clear_emergent_obj(self):
         self.set_emergent_obj((0, 0))
+        g_v.gui.update_map()
 
     def clear_offaxis_obj(self):
         self.set_offaxis_obj((0, 0))
+        g_v.gui.update_map()
 
     def clear_airdrop(self):
         self.set_airdrop((0, 0))
+        g_v.gui.update_map()
 
     def clear_airdrop_goal(self):
         self.set_airdrop_goal((0, 0))
+        g_v.gui.update_map()
 
     def clear_mapping_area(self):
         self.set_mapping_area((0, 0), (0, 0))
+        g_v.gui.update_map()
 
     def clear_all(self):
         self.search_area.vertices.clear()
@@ -132,3 +160,4 @@ class MissionProfile:
         # compute vertices of the area
         for vertex in self.mapping_area.vertices:
             vertex.pos = (0, 0)
+        g_v.gui.update_map()

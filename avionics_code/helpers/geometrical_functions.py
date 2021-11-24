@@ -150,6 +150,7 @@ def unit_normal_vectors_to_line(point_1, point_2):
         a, b, c = line_from_points(point_1, point_2)
         return unit_vector((a, b)), unit_vector((-a, -b))
 
+
 def point_to_line_projection(point, vertex_1, vertex_2):
     """get projection of point on line"""
 
@@ -543,5 +544,3 @@ def point_to_seg_projection(point, vertex_1, vertex_2):
         return vertex_1
     else:
         return vertex_2
-
-

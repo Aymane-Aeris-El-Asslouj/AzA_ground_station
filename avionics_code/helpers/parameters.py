@@ -15,7 +15,8 @@ LANDING_LOITER_CENTER = {
       "longitude": -76.42362494930353,
       "altitude": 120
     }
-WAYPOINT_ACCEPTANCE_DISTANCE = 200  # (ft) distance to consider a waypoint crossed
+WAYPOINT_ACCEPTANCE_DISTANCE_1 = 40  # (ft) distance to consider a mission waypoint 0/1 crossed
+WAYPOINT_ACCEPTANCE_DISTANCE_2 = 130  # (ft) distance to consider a mission waypoint 2/3/4/5 crossed
 MISSION_TIME_LENGTH = 1200  # (seconds) time for mission after which plane lands automatically
 
 # Dashboard parameters
@@ -26,7 +27,7 @@ ARROW_HEAD_SIZE = 30  # (ft) size of arrow heads
 PATH_COLORING_CYCLE = 40  # length of coloring cycle in waypoints for shown path
 
 # Communication
-TIME_CUT_OFF_FOR_FLIGHT_STATUS = 10  # (seconds) time after which a flight profile is no longer displayed
+TIME_CUT_OFF_FOR_FLIGHT_STATUS = 2  # (seconds) time after which a flight profile is no longer displayed
 
 # CV/Hardware parameters
 CV_IMAGE_GROUND_SIZE = 150  # (ft) side of the ground square area covered by CV's camera

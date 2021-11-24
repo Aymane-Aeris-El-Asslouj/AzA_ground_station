@@ -4,6 +4,7 @@ import utm
 FEET_PER_METER = para.FEET_PER_METER
 MAP_REF = para.MAP_REF
 
+
 def geographic_to_cartesian_list(points):
     """Perform geographic to cartesian transformation on a list of points
     and give them in the frame of reference of the center of map"""
@@ -22,6 +23,7 @@ def geographic_to_cartesian(point):
 
     (x, y, p, q) = utm.from_latlon(point['latitude'], point['longitude'])
     return x * FEET_PER_METER, y * FEET_PER_METER
+
 
 def geographic_to_cartesian_center(point):
     """Use dictionary with longitude and latitude to get cartesian

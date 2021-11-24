@@ -16,7 +16,7 @@ sample_item = {
 }
 
 landing_item = {
-                "altitudesAreRelative": True,
+                "altitudesAreRelative": False,
                 "complexItemType": "fwLandingPattern",
                 "landCoordinate": [
                     38.1449043144047,
@@ -199,12 +199,15 @@ def generate_plan(boundary, waypoints, center):
     item['command'] = 22 if i == 0 else 16
     item['doJumpId'] = i + 1
     (x, y) = get_latlon(xc + waypoints[i][0][0] / 3.281, yc + waypoints[i][0][1] / 3.281, zc, dc)
-    item['params'] = [0, 0.2, 0.2, None, x, y, waypoints[i][1] / 3.281]
+    item['params'] = [0, 0, 0, None, x, y, waypoints[i][1] / 3.281]
+    item['AltitudeMode'] = 2
     item['Altitude'] = waypoints[i][1] / 3.281
+    item['AMSLAltAboveTerrain'] = None
+    item['frame'] = 0
     wayp.append(item)
   wayp.append(landing_item)
   plan['mission']['items'] = wayp
-  with open('extra files/aza8.plan', 'w') as f:
+  with open('extra files/aza.plan', 'w') as f:
     json.dump(plan, f)
     
 

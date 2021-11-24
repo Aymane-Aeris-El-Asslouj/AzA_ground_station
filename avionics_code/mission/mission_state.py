@@ -21,12 +21,14 @@ class MissionState:
         # list of waypoints for the whole generated mission
         self.waypoint_list = list()
 
+        self.status = 0
+
     def generate(self):
         """Generates waypoint list for whole mission including
         mission waypoints, airdrop, scouting,
         off axis scouting, and landing"""
 
-        print("\nGenerating mission state...")
+        self.status = 1
         generated_list = list()
 
         # add mission waypoints
@@ -69,7 +71,10 @@ class MissionState:
 
         self.waypoint_list = generated_list
 
-        print("Mission state generated.")
+        self.status = 2
+        g_v.gui.update_system_status()
+
+        g_v.gui.update_mission()
 
     def land(self):
         """empties mission state waypoint list to only have landing loiter"""
@@ -83,6 +88,7 @@ class MissionState:
         if landing_loiter_waypoint.is_valid(g_v.mp):
             self.waypoint_list.append(landing_loiter_waypoint)
             g_v.mc.compute_path()
+            g_v.gui.update_mission()
         else:
             print("Error: landing loiter is not valid")
             print("Called ending mission")
@@ -203,7 +209,7 @@ class MissionState:
 
         # use the coverage finder to find a path
         # to get the list of cells to go through
-        cover = c_f.cover(way_array, last_pos, g_v.mp)
+        cover = c_f.cover(way_array, last_pos)
 
         return cover, off_axis_group
 
@@ -356,6 +362,6 @@ class MissionState:
 
         # use the coverage finder to find a path
         # to get the list of new positions
-        cover = c_f.cover(new_positions, last_pos, g_v.mp, off_axis=True)
+        cover = c_f.cover(new_positions, last_pos, off_axis=True)
 
         return cover, failed_off_axis_list

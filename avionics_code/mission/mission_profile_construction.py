@@ -1,5 +1,5 @@
 import json
-from avionics_code.helpers import geometrical_functions as g_f, parameters as para, geography_functions as gg_f
+from avionics_code.helpers import geography_functions as gg_f
 from avionics_code.path import path_objects as p_o
 from avionics_code.mission import mission_profile as m_p
 

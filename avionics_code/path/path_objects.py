@@ -186,9 +186,11 @@ class Waypoint(MapObject):
         return g_f.distance_2d(self.pos, other_way.pos)
 
     def distance_3d_to(self, other_way):
-        """computes 2d distance to other Waypoint"""
-    
-        return math.hypot(self.pos[0] - other_way.pos[0], self.pos[1] - other_way.pos[1], self.z - other_way.z)
+        """computes 3d distance to other Waypoint"""
+
+        xyz_1 = self.pos[0], self.pos[1], self.z,
+        xyz_2 = other_way.pos[0], other_way.pos[1], other_way.z,
+        return g_f.distance_3d(xyz_1, xyz_2)
 
     def is_valid(self, profile_1):
         """Checks if this waypoint is valid in that it is

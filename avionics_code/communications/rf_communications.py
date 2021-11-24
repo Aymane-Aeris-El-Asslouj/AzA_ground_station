@@ -1,40 +1,63 @@
 from avionics_code.helpers import global_variables as g_v, geography_functions as gg_f
 from avionics_code.helpers import parameters as para
-from avionics_code.communications import generate_plan as g_p, export_plan as e_p
+from avionics_code.communications import generate_plan as g_p
 
-import json
+import aiostream
 import time
-
 import asyncio
+import mavsdk
 
+FEET_PER_METER = para.FEET_PER_METER
 MAP_REF = para.MAP_REF
+
 
 class RFComs:
 
     def __init__(self):
-        pass
+        self.pixhawk = None
+        self.status = 0
 
-    def connect(self):
+    async def connect(self):
         """Connects to plane"""
 
-        print("\nfake connection to plane")
+        self.status = 1
+        g_v.gui.update_system_status()
+        self.pixhawk = mavsdk.System()
+        await self.pixhawk.connect(system_address="udp://:14540")
+        self.status = 2
+        g_v.gui.update_system_status()
 
-    def fetch_plane_status(self):
+    async def fetch_plane_status_loop(self):
         """Gets position and velocity/attitude of plane"""
 
-        print("\nfake get plane status (loads local plane.json)")
+        # Start the tasks
+        asyncio.ensure_future(self.get_telemetry_loop(self.pixhawk))
 
-        with open("extra files/plane.json") as f:
-            data = json.load(f)
+    @staticmethod
+    async def get_telemetry_loop(pixhawk):
+        i = 0
+        a_mix = aiostream.stream.combine.merge(pixhawk.telemetry.position(), pixhawk.telemetry.heading())
+        async with a_mix.stream() as streamer:
+            mix_iter = streamer.__aiter__()
+            while True:
+                data_1 = await mix_iter.__anext__()
+                data_2 = await mix_iter.__anext__()
 
-        plane_pos = gg_f.geographic_to_cartesian_center(data["plane GPS"])
-        plane_z = data["plane GPS"]["Altitude"]
-        ugv_pos = gg_f.geographic_to_cartesian_center(data["ugv GPS"])
-        ugv_z = data["ugv GPS"]["Altitude"]
-        time_int = time.time()
-
-        flight_profile = g_v.th.add_flight_profile(plane_pos, plane_z, ugv_pos, ugv_z, time_int)
-        g_v.sc.upload_telemetry(flight_profile)
+                check_1 = isinstance(data_1, mavsdk.telemetry.Position)
+                check_2 = isinstance(data_2, mavsdk.telemetry.Heading)
+                if check_1 and check_2:
+                    position = data_1
+                    heading = data_2
+                    i += 1
+                    if i % 50 == 0:
+                        gps = {'latitude': position.latitude_deg, 'longitude': position.longitude_deg}
+                        plane_pos = gg_f.geographic_to_cartesian_center(gps)
+                        plane_z = position.absolute_altitude_m * FEET_PER_METER
+                        time_int = time.time()
+                        plane_orientation = heading.heading_deg
+                        p_o = plane_orientation
+                        print(p_o)
+                        g_v.th.add_flight_profile(plane_pos, plane_z, p_o, (0, 0), 0, 0, time_int)
 
     def end_mission(self):
         """sends plane in emergency landing mode"""

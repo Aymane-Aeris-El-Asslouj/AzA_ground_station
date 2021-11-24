@@ -1,4 +1,5 @@
-from avionics_code.helpers import geometrical_functions as g_f, parameters as para, global_variables as g_v
+from avionics_code.helpers import geometrical_functions as g_f, parameters as para
+from avionics_code.helpers import global_variables as g_v
 import pygame
 import math
 
@@ -8,13 +9,13 @@ ARROW_HEAD_SIZE = para.ARROW_HEAD_SIZE
 PREFERRED_TURN_RADIUS = para.PREFERRED_TURN_RADIUS
 
 
-def draw_text_off(position, text, color):
-    """draws text near some position"""
+def draw_centered_text(surface, font, text, percentage_pos):
+    """draws text centered on surface"""
 
-    ratio = (DASHBOARD_SIZE / 650)
-    font_2 = pygame.font.SysFont('Arial', int(10 * ratio))
-    text_1 = font_2.render(text, True, color)
-    g_v.gui.screen.blit(text_1, (position[0] + 10 * ratio, position[1] - 10 * ratio))
+    D_S = DASHBOARD_SIZE
+    label_x = font.render(text, True, (0, 0, 0))
+    rect_x = label_x.get_rect(center=(D_S * percentage_pos[0], percentage_pos[1] * D_S / 15))
+    surface.blit(label_x, rect_x)
 
 
 def draw_rescaled_points(surface, map_object_list, selected, color, style=0):
@@ -40,45 +41,37 @@ def draw_rescaled_points(surface, map_object_list, selected, color, style=0):
             pairs = [(1, 0), (0, 1), (-1, 0), (0, -1)]
             # get edges of diamond
             points = [(vertex_dash[0] + w_s * pair[0], vertex_dash[1] + w_s * pair[1]) for pair in pairs]
-            pygame.draw.polygon(g_v.gui.screen, color, points)
+            pygame.draw.polygon(surface, color, points)
 
 
-def draw_path_points_straight(path, color):
-    """draw waypoints of path"""
-
-    for i in range(len(path.waypoint_list)):
-        vertex_dash_1 = g_v.gui.dashboard_projection(path.waypoint_list[i])
-        pygame.draw.circle(g_v.gui.screen, color, vertex_dash_1, WAYPOINT_SIZE)
-
-
-def draw_curved_edge(way_1, way_2, color):
+def draw_curved_edge(surface, way_1, way_2, color):
     """draw edge between two waypoints along with turning points"""
 
     # Get previous vertex or its off shoot waypoint if it exists
     vertex_1 = g_v.gui.dashboard_projection(way_1)
-    pygame.draw.circle(g_v.gui.screen, (255, 255, 0), vertex_1, WAYPOINT_SIZE)
+    pygame.draw.circle(surface, (255, 255, 0), vertex_1, WAYPOINT_SIZE)
     # Get next vertex
     vertex_2 = g_v.gui.dashboard_projection(way_2)
-    pygame.draw.circle(g_v.gui.screen, (255, 255, 0), vertex_2, WAYPOINT_SIZE)
+    pygame.draw.circle(surface, (255, 255, 0), vertex_2, WAYPOINT_SIZE)
 
     # turn waypoint after vertex 1
     if way_1.post_turn_waypoint is not None:
         after_turn = g_v.gui.dashboard_projection(way_1.post_turn_waypoint)
-        pygame.draw.circle(g_v.gui.screen, (255, 105, 180), after_turn, WAYPOINT_SIZE)
-        pygame.draw.line(g_v.gui.screen, (255, 105, 180), vertex_1, after_turn)
+        pygame.draw.circle(surface, (255, 105, 180), after_turn, WAYPOINT_SIZE)
+        pygame.draw.line(surface, (255, 105, 180), vertex_1, after_turn)
         vertex_1 = after_turn
 
     # turn waypoint before vertex 2
     if way_2.pre_turn_waypoint is not None:
         before_turn = g_v.gui.dashboard_projection(way_2.pre_turn_waypoint)
-        pygame.draw.circle(g_v.gui.screen, (255, 105, 180), before_turn, WAYPOINT_SIZE)
-        pygame.draw.line(g_v.gui.screen, (255, 105, 180), before_turn, vertex_2)
+        pygame.draw.circle(surface, (255, 105, 180), before_turn, WAYPOINT_SIZE)
+        pygame.draw.line(surface, (255, 105, 180), before_turn, vertex_2)
         vertex_2 = before_turn
 
-    pygame.draw.line(g_v.gui.screen, color, vertex_1, vertex_2, width=2)
+    pygame.draw.line(surface, color, vertex_1, vertex_2, width=2)
 
 
-def draw_arrow(surf, object_origin, map_vector, color):
+def draw_arrow(surface, object_origin, map_vector, color):
     """Draw an arrow starting at an object origin
     and guided by a map vector"""
 
@@ -117,5 +110,5 @@ def draw_arrow(surf, object_origin, map_vector, color):
         right_dash = g_v.gui.dashboard_projection_pos(right)
 
         # draw arrow body and head
-        pygame.draw.line(surf, color, origin_dash, end_dash, width=1)
-        pygame.draw.polygon(surf, color, [left_dash, right_dash, end_dash])
+        pygame.draw.line(surface, color, origin_dash, end_dash, width=1)
+        pygame.draw.polygon(surface, color, [left_dash, right_dash, end_dash])

@@ -1,5 +1,4 @@
 from avionics_code.helpers import geometrical_functions as g_f, parameters as para
-from avionics_code.path import path_functions as p_f, path_objects as p_o
 
 WEIGHT_OF_ANGLE = para.WEIGHT_OF_ANGLE
 BIAS_OF_ANGLE = para.BIAS_OF_ANGLE
@@ -8,7 +7,7 @@ BIAS_OF_DISTANCE = para.BIAS_OF_DISTANCE
 OFF_AXIS_WEIGHT_OF_ANGLE = para.OFF_AXIS_WEIGHT_OF_ANGLE
 
 
-def cover(waypoint_array, plane_pos, profile, off_axis=False):
+def cover(waypoint_array, plane_pos, off_axis=False):
     """Finds a path that covers all waypoints in list on a map"""
 
     path = list()
@@ -45,6 +44,7 @@ def cover(waypoint_array, plane_pos, profile, off_axis=False):
         last_pos = next_cell.pos
 
     return path
+
 
 def cell_cost(cell_0, cell_1, cell_2, off_axis):
     """Finds the 'cost' of going into a cell
