@@ -32,3 +32,16 @@ def geographic_to_cartesian_center(point):
     c_x, c_y = geographic_to_cartesian(MAP_REF)
     (x, y, p, q) = utm.from_latlon(point['latitude'], point['longitude'])
     return x * FEET_PER_METER - c_x, y * FEET_PER_METER - c_y
+
+
+def cartesian_to_geo(point_2d):
+    """Gives (lat,lon) from cartesian coordinates in the map
+    center reference frame"""
+
+    # Get cartesian position of center
+    (x, y, p, q) = utm.from_latlon(MAP_REF['latitude'], MAP_REF['longitude'])
+
+    # add to it the position of the point
+    x, y = x + point_2d[0]/FEET_PER_METER, y + point_2d[1]/FEET_PER_METER
+
+    return utm.to_latlon(x, y, p, q)

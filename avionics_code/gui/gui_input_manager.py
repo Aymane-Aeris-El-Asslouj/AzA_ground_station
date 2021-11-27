@@ -2,15 +2,23 @@ from avionics_code.helpers import geometrical_functions as g_f, parameters as pa
 from avionics_code.helpers import global_variables as g_v
 import pygame
 import os
+import time
+import threading
 
 DASHBOARD_SIZE = para.DASHBOARD_SIZE
 WAYPOINT_SIZE = para.WAYPOINT_SIZE * (DASHBOARD_SIZE / 650)
+FRAMES_PER_SECOND = para.FRAMES_PER_SECOND
 
 
 def gui_input_manager_loop(g_u_i):
     """Check for interface inputs and update the mission profile"""
 
+    last_time = time.time()
     while True:
+        # keep the frame rate under or equal to FRAMES_PER_SECOND
+        new_time = time.time()
+        time.sleep(abs(1/FRAMES_PER_SECOND - (new_time - last_time)))
+        last_time = time.time()
 
         # check interface inputs
         for event in pygame.event.get():
@@ -33,15 +41,17 @@ def gui_input_manager_loop(g_u_i):
 
                 def action_1():
                     g_v.mp = g_v.sc.get_mission()
-                    g_v.gui.update_map()
+                    g_v.gui.to_draw["mission profile"] = True
 
                 # left click actions for buttons
                 left_button_actions = {
                     "Reload button": action_1,
                     "Clear button": g_v.mp.clear_all,
-                    "Generate button": g_v.ms.generate,
-                    "Compute button": g_v.mc.compute_path,
-                    "Export button": g_v.mc.export_path,
+                    "Generate button": g_v.ms.launch_generate,
+                    "Compute button": g_v.mc.launch_compute_path,
+                    "Upload mission button": g_v.rf.launch_upload_mission,
+                    "Start mission button": g_v.rf.launch_start_mission,
+                    "Pause mission button": g_v.rf.launch_pause_mission,
                     "land button": g_v.ms.land,
                     "ending mission button": g_v.rf.end_mission,
                     "drop authorization button": g_v.rf.authorize_airdrop
@@ -76,16 +86,16 @@ def gui_input_manager_loop(g_u_i):
                                 # change input type if the button does that
                                 if key in input_type_dict_rev.keys():
                                     g_u_i.input_type = input_type_dict_rev[key]
-                                    g_u_i.update_u_i()
+                                    g_u_i.to_draw["user interface"] = True
                                 # change mission state input type if there is one
                                 if key in mission_state_display_dict_rev.keys():
                                     index = mission_state_display_dict_rev[key]
                                     var = g_u_i.mission_state_display[index]
                                     g_u_i.mission_state_display[index] = (var + 1) % 2
-                                    g_u_i.update_u_i()
-                                    g_u_i.update_map()
-                                    g_u_i.update_mission()
-                                    g_u_i.update_path()
+                                    g_u_i.to_draw["user interface"] = True
+                                    g_u_i.to_draw["mission profile"] = True
+                                    g_u_i.to_draw["mission state"] = True
+                                    g_u_i.to_draw["path"] = True
                                 # do a left click actions if the button has one
                                 if key in left_button_actions.keys():
                                     left_button_actions[key]()
@@ -103,7 +113,7 @@ def gui_input_manager_loop(g_u_i):
                                 if key in input_type_dict_rev.keys():
                                     g_u_i.is_displayed[input_type_dict_rev[key]] += 1
                                     g_u_i.is_displayed[input_type_dict_rev[key]] %= 2
-                                    g_u_i.update_map()
+                                    g_u_i.to_draw["mission profile"] = True
 
                 # if the user is not interacting with the input menu, then add whatever they want to input
                 # (left click) or delete whatever they are trying to delete (right click)
@@ -258,21 +268,54 @@ def gui_input_manager_loop(g_u_i):
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_BACKSPACE:
                     g_u_i.altitude_box = float(int(g_u_i.altitude_box/10))
-                    g_u_i.update_u_i()
+                    g_u_i.to_draw["user interface"] = True
                 else:
                     if event.unicode.isdigit():
                         g_u_i.altitude_box = 10 * g_u_i.altitude_box + int(event.unicode)
-                        g_u_i.update_u_i()
+                        g_u_i.to_draw["user interface"] = True
 
             # Close dashboard if prompted to, and quit the program
             if event.type == pygame.QUIT:
-                with open("extra files/settings.txt", "w") as file:
-                    for i in range(len(g_u_i.mission_state_display)):
-                        file.write(str(g_u_i.mission_state_display[i]))
-                os._exit(1)
+                g_v.gui.close_request = True
+                g_v.rf.close_request = True
+                g_v.mc.close_request = True
+
+                def closing():
+                    time.sleep(1)
+                    os._exit(1)
+
+                threading.Thread(target=closing).start()
 
         if g_u_i.inputing == 1 and g_u_i.input_type == 1:
-            g_u_i.update_map()
+            g_u_i.to_draw["mission profile"] = True
 
-        if sum(g_u_i.active_drawing) == 0:
-            pygame.display.update()
+        # updating the display by executing the drawing requests
+        drawing_dict = {
+            "user interface": g_u_i.draw_user_interface,
+            "system status": g_u_i.draw_system_status,
+            "mission profile": g_u_i.draw_mission_profile,
+            "mission state": g_u_i.draw_mission_state,
+            "telemetry": g_u_i.draw_telemetry,
+            "path": g_u_i.draw_path,
+        }
+        to_draw = g_u_i.to_draw
+        
+        drawing_needed = False
+        # check if a drawing request is active
+        for key in to_draw:
+            if to_draw[key]:
+                to_draw[key] = False
+                drawing_dict[key]()
+                drawing_needed = True
+        # if any requests were executed, update display
+        if drawing_needed:
+            g_u_i.display_update()
+
+        pygame.display.update()
+
+        if g_u_i.close_request:
+            with open("extra files/settings.txt", "w") as file:
+                for i in range(len(g_u_i.mission_state_display)):
+                    file.write(str(g_u_i.mission_state_display[i]))
+            pygame.quit()
+            break

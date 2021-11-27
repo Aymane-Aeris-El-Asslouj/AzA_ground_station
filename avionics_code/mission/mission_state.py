@@ -1,4 +1,5 @@
 import math
+import threading
 
 from avionics_code.path import path_objects as p_o, coverage_finder as c_f
 from avionics_code.helpers import global_variables as g_v, parameters as para, geometrical_functions as g_f
@@ -10,7 +11,8 @@ OFF_AXIS_IMAGING_RANGE = para.OFF_AXIS_IMAGING_RANGE
 AIR_DROP_ALTITUDE = para.AIR_DROP_ALTITUDE
 IMAGING_ALTITUDE = para.IMAGING_ALTITUDE
 OFF_AXIS_IMAGING_ALTITUDE = para.OFF_AXIS_IMAGING_ALTITUDE
-LANDING_LOITER_CENTER = para.LANDING_LOITER_CENTER
+LANDING_LOITER_COORDINATES_FRAME_0 = para.LANDING_LOITER_COORDINATES_FRAME_0
+FEET_PER_METER = para.FEET_PER_METER
 
 
 class MissionState:
@@ -21,14 +23,23 @@ class MissionState:
         # list of waypoints for the whole generated mission
         self.waypoint_list = list()
 
-        self.status = 0
+        self.generation_status = 0
+
+    def launch_generate(self):
+        """starts path computation if it not already running, returns thread"""
+
+        # check that path computation is not ongoing
+        if self.generation_status != 1:
+            new_thread = threading.Thread(target=self.generate())
+            new_thread.start()
+            return new_thread
 
     def generate(self):
         """Generates waypoint list for whole mission including
         mission waypoints, airdrop, scouting,
         off axis scouting, and landing"""
 
-        self.status = 1
+        self.generation_status = 1
         generated_list = list()
 
         # add mission waypoints
@@ -59,8 +70,9 @@ class MissionState:
         generated_list.extend(off_axis_trajectory)
 
         # add landing
-        loiter_tuple = geo_f.geographic_to_cartesian_center(LANDING_LOITER_CENTER)
-        loiter_altitude = LANDING_LOITER_CENTER["altitude"]
+        LOITER = LANDING_LOITER_COORDINATES_FRAME_0
+        loiter_tuple = geo_f.geographic_to_cartesian_center(LOITER)
+        loiter_altitude = LOITER["altitude"]
         landing_loiter_waypoint = p_o.Waypoint(5, loiter_tuple, loiter_altitude, is_mission=True)
         if landing_loiter_waypoint.is_valid(g_v.mp):
             generated_list.append(landing_loiter_waypoint)
@@ -71,10 +83,10 @@ class MissionState:
 
         self.waypoint_list = generated_list
 
-        self.status = 2
-        g_v.gui.update_system_status()
+        self.generation_status = 2
+        g_v.gui.to_draw["system status"] = True
 
-        g_v.gui.update_mission()
+        g_v.gui.to_draw["mission state"] = True
 
     def land(self):
         """empties mission state waypoint list to only have landing loiter"""
@@ -82,13 +94,14 @@ class MissionState:
         self.waypoint_list.clear()
 
         # get loiter position for landing
-        loiter_tuple = geo_f.geographic_to_cartesian_center(LANDING_LOITER_CENTER)
-        loiter_altitude = LANDING_LOITER_CENTER["altitude"]
+        LOITER = LANDING_LOITER_COORDINATES_FRAME_0
+        loiter_tuple = geo_f.geographic_to_cartesian_center(LOITER)
+        loiter_altitude = LOITER["altitude"]
         landing_loiter_waypoint = p_o.Waypoint(5, loiter_tuple, loiter_altitude, is_mission=True)
         if landing_loiter_waypoint.is_valid(g_v.mp):
             self.waypoint_list.append(landing_loiter_waypoint)
             g_v.mc.compute_path()
-            g_v.gui.update_mission()
+            g_v.gui.to_draw["mission state"] = True
         else:
             print("Error: landing loiter is not valid")
             print("Called ending mission")

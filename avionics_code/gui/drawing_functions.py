@@ -9,11 +9,11 @@ ARROW_HEAD_SIZE = para.ARROW_HEAD_SIZE
 PREFERRED_TURN_RADIUS = para.PREFERRED_TURN_RADIUS
 
 
-def draw_centered_text(surface, font, text, percentage_pos):
+def draw_centered_text(surface, font, text, percentage_pos, color=(0, 0, 0)):
     """draws text centered on surface"""
 
     D_S = DASHBOARD_SIZE
-    label_x = font.render(text, True, (0, 0, 0))
+    label_x = font.render(text, True, color)
     rect_x = label_x.get_rect(center=(D_S * percentage_pos[0], percentage_pos[1] * D_S / 15))
     surface.blit(label_x, rect_x)
 
@@ -69,6 +69,21 @@ def draw_curved_edge(surface, way_1, way_2, color):
         vertex_2 = before_turn
 
     pygame.draw.line(surface, color, vertex_1, vertex_2, width=2)
+
+
+def draw_triangle(surface, object_origin, angle, size, color):
+    """Draw a triangle at the object origin with the angle
+    given from the north counterclockwise"""
+
+    origin = object_origin.pos
+    angles = [(2/3)*math.pi, 0, -(2/3)*math.pi]
+    vecs = [g_f.rotate_vector((0, size), angle_i) for angle_i in angles]
+    vecs.append((0, 0))
+
+    rotated_vecs = [g_f.rotate_vector(vec, angle) for vec in vecs]
+    vertices = [g_f.add_vectors(vec, origin) for vec in rotated_vecs]
+    dash_vertices = [g_v.gui.dashboard_projection_pos(vertex) for vertex in vertices]
+    pygame.draw.polygon(surface, color, dash_vertices)
 
 
 def draw_arrow(surface, object_origin, map_vector, color):

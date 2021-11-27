@@ -2,10 +2,15 @@ from avionics_code.path import path_functions as p_f, path_objects as p_o
 from avionics_code.helpers import global_variables as g_v, geometrical_functions as g_f
 from avionics_code.helpers import parameters as para
 
+import threading
+import time
+import asyncio
+
 WAYPOINT_ACCEPTANCE_DISTANCE_1 = para.WAYPOINT_ACCEPTANCE_DISTANCE_1
 WAYPOINT_ACCEPTANCE_DISTANCE_2 = para.WAYPOINT_ACCEPTANCE_DISTANCE_2
 OBSTACLE_DISTANCE_FOR_VALID_PASS = para.OBSTACLE_DISTANCE_FOR_VALID_PASS
 MISSION_TIME_LENGTH = para.MISSION_TIME_LENGTH
+MISSION_STATE_REFRESH_RATE = para.MISSION_STATE_REFRESH_RATE
 
 
 class MissionControl:
@@ -18,26 +23,44 @@ class MissionControl:
 
         self.exportable_chosen_path = None
 
-        self.status = 0
+        self.path_computation_status = 0
 
-    def refresh_mission_state(self):
+        self.close_request = False
+
+    def refresh_mission_state_loop(self):
         """Refreshes mission state by checking if a new waypoint was reached,
         then checks if the plane path needs to be recomputed or if time ran out"""
 
-        # update the waypoint status list and make appropriate actions
-        self.update_waypoint_status_list()
+        last_time = time.time()
+        while True:
+            # keep the frame rate under or equal to FRAMES_PER_SECOND
+            new_time = time.time()
+            time.sleep(abs(1 / MISSION_STATE_REFRESH_RATE - (new_time - last_time)))
+            last_time = time.time()
 
-        # land if time ran out
-        if self.check_timeout():
-            print("\nTime ran out, starting landing...")
-            g_v.ms.land()
-            self.compute_path()
-            self.export_path()
+            if self.close_request:
+                break
 
-        # update path if there is no path or plane deviated from original path
-        if self.chosen_path is None or self.check_path_deviation():
-            self.compute_path()
-            self.export_path()
+            # check if plane position data is available
+            if g_v.th.position.data is not None:
+                # update the waypoint status list and make appropriate actions
+                self.update_waypoint_status_list()
+
+                # land if time ran out
+                if self.check_timeout():
+                    print("\nTime ran out, starting landing...")
+                    g_v.ms.land()
+                    path_computation_attempt = self.launch_compute_path()
+                    if path_computation_attempt is not None:
+                        path_computation_attempt.join()
+                        g_v.rf.launch_upload_mission()
+
+                # update path if there is no path or plane deviated from original path
+                if self.chosen_path is None or self.check_path_deviation():
+                    path_computation_attempt = self.launch_compute_path()
+                    if path_computation_attempt is not None:
+                        path_computation_attempt.join()
+                        g_v.rf.launch_upload_mission()
 
     def check_path_deviation(self):
         """Check if path deviated from original computed path"""
@@ -48,13 +71,12 @@ class MissionControl:
     def check_timeout():
         """checks if mission time is over"""
 
-        return g_v.th.last_flight_profile().time_int - g_v.init_time > MISSION_TIME_LENGTH
+        return time.time() - g_v.init_time > MISSION_TIME_LENGTH
 
     def update_waypoint_status_list(self):
         """checks if a waypoint from the mission state was reached"""
 
-        # get info for path computation
-        plane_obj = g_v.th.last_flight_profile().plane_obj
+        plane_obj = g_v.th.position.data["flight object"]
         plane_3d_pos = (plane_obj.pos[0], plane_obj.pos[1], plane_obj.z)
         waypoint_list = g_v.ms.waypoint_list
         next_waypoint = waypoint_list[0]
@@ -76,7 +98,7 @@ class MissionControl:
             # do what needs to be done at the mission waypoint (like taking a picture)
             self.mission_action(next_waypoint.mission_index)
             del g_v.ms.waypoint_list[0]
-            g_v.gui.update_mission()
+            g_v.gui.to_draw["mission state"] = True
 
     @staticmethod
     def mission_action(mission_index):
@@ -89,19 +111,25 @@ class MissionControl:
         elif mission_index == 3:
             g_v.rf.take_off_axis_picture()
 
-    def export_path(self):
-        """exports the currently stored path"""
+    def launch_compute_path(self):
+        """starts path computation if it not already running, returns thread"""
 
-        g_v.rf.export_path(self.exportable_chosen_path)
+        # check that path computation is not ongoing
+        if self.path_computation_status != 1:
+            new_thread = threading.Thread(target=self.compute_path())
+            new_thread.start()
+            return new_thread
+        else:
+            return None
 
     def compute_path(self):
         """Computes path to be sent to the plane
         based on the mission state"""
 
-        self.status = 1
+        self.path_computation_status = 1
 
         # get info for path computation
-        plane_obj = g_v.th.last_flight_profile().plane_obj
+        plane_obj = g_v.th.position.data["flight object"]
         plane_pos = plane_obj.pos
         plane_z = plane_obj.z
         waypoint_list = g_v.ms.waypoint_list
@@ -133,24 +161,28 @@ class MissionControl:
         if not self.chosen_path:
             return
 
-        waypoint_list_new = list()
-        for way in self.chosen_path.waypoint_list:
+        # reformat the chosen path to be exportable by
+        # adding turning points to the path itself
+        flattened_waypoint_list = list()
+        for way in self.chosen_path.waypoint_list[1:]:
 
+            # add pre turn waypoints
             pre_turn_waypoint = way.pre_turn_waypoint
             if pre_turn_waypoint is not None:
-                waypoint_list_new.append(pre_turn_waypoint)
+                flattened_waypoint_list.append(pre_turn_waypoint)
 
-            waypoint_list_new.append(way)
+            flattened_waypoint_list.append(way)
 
+            # add post turn waypoints
             post_turn_waypoint = way.post_turn_waypoint
             if post_turn_waypoint is not None:
-                waypoint_list_new.append(post_turn_waypoint)
+                flattened_waypoint_list.append(post_turn_waypoint)
 
-        self.exportable_chosen_path = p_o.Path(waypoint_list_new)
+        self.exportable_chosen_path = p_o.Path(flattened_waypoint_list)
 
-        self.status = 2
-        g_v.gui.update_system_status()
-        g_v.gui.update_path()
+        self.path_computation_status = 2
+        g_v.gui.to_draw["system status"] = True
+        g_v.gui.to_draw["path"] = True
 
     def smart_path_finder(self, plane_pos, plane_z, original_list, sliced_list, profile):
         """finds recursively a path through the waypoints while deleting
