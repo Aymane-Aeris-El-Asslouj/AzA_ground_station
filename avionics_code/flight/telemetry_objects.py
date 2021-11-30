@@ -9,7 +9,6 @@ class TelemetryHistory:
     """stores history of flight info"""
 
     def __init__(self):
-        self.connection = TelemetryObject()
         self.position = TelemetryObject()
         self.velocity = TelemetryObject()
         self.heading = TelemetryObject()

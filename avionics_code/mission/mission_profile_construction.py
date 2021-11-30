@@ -1,7 +1,8 @@
-import json
 from avionics_code.helpers import geography_functions as gg_f
 from avionics_code.path import path_objects as p_o
 from avionics_code.mission import mission_profile as m_p
+
+import json
 
 
 def json_to_mission_profile(file):
@@ -29,7 +30,7 @@ def json_to_mission_profile(file):
     mission_xy_tuples = g_t_c_l(data['waypoints'])
     altitude_tuples = list(w_i["altitude"] for w_i in data['waypoints'])
     waypoint_tuples = list(zip(mission_xy_tuples, altitude_tuples))
-    m_p_var.mission_waypoints = list(p_o.Waypoint(0, t[0], t[1], is_mission=True) for t in waypoint_tuples)
+    m_p_var.mission_waypoints = list(p_o.Waypoint(0, t[0], t[1], is_mission=1) for t in waypoint_tuples)
 
     # Search grid
     pos_iterator = g_t_c_l(data['searchGridPoints'])
@@ -63,6 +64,9 @@ def json_to_mission_profile(file):
     pairs = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
     map_list = [p_o.Vertex((c_x+pair[0]*height*(8/9), c_y+pair[1]*height/2)) for pair in pairs]
     m_p_var.mapping_area = p_o.MapArea(map_list)
+
+    # generate border nodes
+    m_p_var.border.create_vertex_nodes(m_p_var)
 
     return m_p_var
 

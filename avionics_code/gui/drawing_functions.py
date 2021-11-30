@@ -1,12 +1,25 @@
 from avionics_code.helpers import geometrical_functions as g_f, parameters as para
-from avionics_code.helpers import global_variables as g_v
+from avionics_code.helpers import global_variables as g_v, geography_functions as gg_f
+
 import pygame
 import math
 
 DASHBOARD_SIZE = para.DASHBOARD_SIZE
 WAYPOINT_SIZE = para.WAYPOINT_SIZE * (DASHBOARD_SIZE / 650)
 ARROW_HEAD_SIZE = para.ARROW_HEAD_SIZE
-PREFERRED_TURN_RADIUS = para.PREFERRED_TURN_RADIUS
+
+
+def draw_map_marker(zoom, surf, frame_5_coordinates, text):
+    """draw map markers like takeoff and landing"""
+
+    land_off_pos = gg_f.geographic_to_cartesian_center_5(frame_5_coordinates)
+    dash_pos = g_v.gui.dashboard_projection_pos(land_off_pos)
+    pygame.draw.circle(surf, (0, 0, 0), dash_pos, WAYPOINT_SIZE * zoom)
+
+    zoomed_font = pygame.font.SysFont('Arial', int(7 * (DASHBOARD_SIZE / 650) * zoom))
+    label_x = zoomed_font.render(text, True, (255, 255, 255))
+    rect_x = label_x.get_rect(center=dash_pos)
+    surf.blit(label_x, rect_x)
 
 
 def draw_centered_text(surface, font, text, percentage_pos, color=(0, 0, 0)):
@@ -18,7 +31,7 @@ def draw_centered_text(surface, font, text, percentage_pos, color=(0, 0, 0)):
     surface.blit(label_x, rect_x)
 
 
-def draw_rescaled_points(surface, map_object_list, selected, color, style=0):
+def draw_rescaled_points(zoom, surface, map_object_list, selected, color, style=0):
     """draw a list of map objects with the one
     selected and the previous one being bigger"""
 
@@ -28,9 +41,9 @@ def draw_rescaled_points(surface, map_object_list, selected, color, style=0):
         is_selected_2 = (selected + 1) % max(1, len(map_object_list)) == i
         # if the waypoint is selected, make it bigger
         if is_selected_1 or is_selected_2:
-            waypoint_size = WAYPOINT_SIZE * 1.5
+            waypoint_size = WAYPOINT_SIZE * 1.5 * zoom
         else:
-            waypoint_size = WAYPOINT_SIZE
+            waypoint_size = WAYPOINT_SIZE * zoom
         vertex_dash = g_v.gui.dashboard_projection(map_object_list[i])
         # style 0 means draw circle waypoints
         if style == 0:
@@ -40,50 +53,25 @@ def draw_rescaled_points(surface, map_object_list, selected, color, style=0):
             w_s = waypoint_size
             pairs = [(1, 0), (0, 1), (-1, 0), (0, -1)]
             # get edges of diamond
-            points = [(vertex_dash[0] + w_s * pair[0], vertex_dash[1] + w_s * pair[1]) for pair in pairs]
+            v_d = vertex_dash
+            points = [(v_d[0] + w_s * pair[0], v_d[1] + w_s * pair[1]) for pair in pairs]
             pygame.draw.polygon(surface, color, points)
 
 
-def draw_curved_edge(surface, way_1, way_2, color):
-    """draw edge between two waypoints along with turning points"""
-
-    # Get previous vertex or its off shoot waypoint if it exists
-    vertex_1 = g_v.gui.dashboard_projection(way_1)
-    pygame.draw.circle(surface, (255, 255, 0), vertex_1, WAYPOINT_SIZE)
-    # Get next vertex
-    vertex_2 = g_v.gui.dashboard_projection(way_2)
-    pygame.draw.circle(surface, (255, 255, 0), vertex_2, WAYPOINT_SIZE)
-
-    # turn waypoint after vertex 1
-    if way_1.post_turn_waypoint is not None:
-        after_turn = g_v.gui.dashboard_projection(way_1.post_turn_waypoint)
-        pygame.draw.circle(surface, (255, 105, 180), after_turn, WAYPOINT_SIZE)
-        pygame.draw.line(surface, (255, 105, 180), vertex_1, after_turn)
-        vertex_1 = after_turn
-
-    # turn waypoint before vertex 2
-    if way_2.pre_turn_waypoint is not None:
-        before_turn = g_v.gui.dashboard_projection(way_2.pre_turn_waypoint)
-        pygame.draw.circle(surface, (255, 105, 180), before_turn, WAYPOINT_SIZE)
-        pygame.draw.line(surface, (255, 105, 180), before_turn, vertex_2)
-        vertex_2 = before_turn
-
-    pygame.draw.line(surface, color, vertex_1, vertex_2, width=2)
-
-
-def draw_triangle(surface, object_origin, angle, size, color):
+def draw_triangle(zoom, surface, object_origin, angle, size, color):
     """Draw a triangle at the object origin with the angle
     given from the north counterclockwise"""
 
     origin = object_origin.pos
     angles = [(2/3)*math.pi, 0, -(2/3)*math.pi]
-    vecs = [g_f.rotate_vector((0, size), angle_i) for angle_i in angles]
+    vecs = [g_f.rotate_vector((size/(zoom ** 0.5), 0), angle_i) for angle_i in angles]
     vecs.append((0, 0))
 
     rotated_vecs = [g_f.rotate_vector(vec, angle) for vec in vecs]
     vertices = [g_f.add_vectors(vec, origin) for vec in rotated_vecs]
     dash_vertices = [g_v.gui.dashboard_projection_pos(vertex) for vertex in vertices]
     pygame.draw.polygon(surface, color, dash_vertices)
+    pygame.draw.polygon(surface, (0, 0, 0), dash_vertices, width=2)
 
 
 def draw_arrow(surface, object_origin, map_vector, color):

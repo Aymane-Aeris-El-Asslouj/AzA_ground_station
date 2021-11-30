@@ -1,20 +1,21 @@
 from avionics_code.path import path_objects as p_o
-from avionics_code.helpers import parameters as para
+from avionics_code.helpers import parameters as para, global_variables as g_v
 from avionics_code.helpers import geometrical_functions as g_f
-
-import copy
 
 PATHS_PER_WAYPOINTS = para.PATHS_PER_WAYPOINTS
 MAX_ATTEMPTS_PER_WAYPOINTS = para.MAX_ATTEMPTS_PER_WAYPOINTS
 BACK_TRACKING_DEPTH = para.BACK_TRACKING_DEPTH
 
 
-def recursive_path_search(path_to_now, waypoint_list, profile, depth):
+def recursive_path_search(path_to_now, waypoint_list, profile, depth, full_list):
     """extends a path so it can reach the first waypoint of a waypoint list
     then calls itself to continue the search till the waypoint list is empty.
     At that point, it returns the found path. the path is curved and checked
     in altitude to make sure it is valid, if not, switch to another found path
     or return that the previously found path needs to be rebuilt"""
+
+    g_v.gui.path_search_percentage = 100 * (1 - len(waypoint_list)/len(full_list))
+    g_v.gui.to_draw["system status"] = True
 
     # max depth reached in the search
     local_depth = depth
@@ -35,7 +36,7 @@ def recursive_path_search(path_to_now, waypoint_list, profile, depth):
             new_path_to_now = p_o.Path(path_to_now.waypoint_list + picked_next_path.waypoint_list[1:])
 
             # calls itself and get the path found and max depth that it reached
-            r_1, r_2 = recursive_path_search(new_path_to_now, waypoint_list[1:], profile, depth+1)
+            r_1, r_2 = recursive_path_search(new_path_to_now, waypoint_list[1:], profile, depth+1, full_list)
             explore_attempt = r_1
             max_depth = r_2
 
@@ -109,18 +110,18 @@ def single_path_search(way_1, way_2, profile, path_number):
         # extend path by connecting it to nodes created on obstacles
         for obstacle_i in obstacles:
             # create two nodes on each side of each obstacle
-            node_1, node_2 = obstacle_i.create_tangent_nodes(last_node, mission_index)
+            node_1, node_2 = obstacle_i.create_tangent_nodes(last_node, profile, mission_index)
             if node_1 is not None:
                 if last_node.is_connectable_to(node_1, profile):
                     path_extensions.append(p_o.Path(best_path.waypoint_list + [node_1]))
+            if node_2 is not None:
                 if last_node.is_connectable_to(node_2, profile):
                     path_extensions.append(p_o.Path(best_path.waypoint_list + [node_2]))
 
         # extend path by connecting it to nodes created on border
         for node_i in border_nodes:
             if last_node.is_connectable_to(node_i, profile):
-                node_new = copy.deepcopy(node_i)
-                node_new.mission_index = mission_index
+                node_new = p_o.Waypoint(mission_index, node_i.pos, parent_vertex=node_i.parent_vertex)
                 path_extensions.append(p_o.Path(best_path.waypoint_list + [node_new]))
 
         """add extensions of best path that did not reach

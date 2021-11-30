@@ -1,4 +1,5 @@
 from avionics_code.helpers import geometrical_functions as g_f, parameters as para
+
 import utm
 
 FEET_PER_METER = para.FEET_PER_METER
@@ -45,3 +46,21 @@ def cartesian_to_geo(point_2d):
     x, y = x + point_2d[0]/FEET_PER_METER, y + point_2d[1]/FEET_PER_METER
 
     return utm.to_latlon(x, y, p, q)
+
+
+def frame_5_to_frame_0(frame_5_coordinates):
+    """switches from frame 5 coordinates to frame 0 coordinates"""
+
+    return {
+        "latitude": frame_5_coordinates['latitude']/(10**7),
+        "longitude": frame_5_coordinates['longitude']/(10**7),
+        "altitude": frame_5_coordinates["altitude"]
+    }
+
+
+def geographic_to_cartesian_center_5(point):
+    """Use dictionary with longitude and latitude to get cartesian
+    position in feet with respect to center of map from frame 5"""
+
+    frame_0 = frame_5_to_frame_0(point)
+    return geographic_to_cartesian_center(frame_0)

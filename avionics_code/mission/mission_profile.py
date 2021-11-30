@@ -7,8 +7,6 @@ class MissionProfile:
 
     def __init__(self):
 
-        self.retrieval_status = 0
-
         # lost coms (MapObject)
         self.lost_comms_object = None
 

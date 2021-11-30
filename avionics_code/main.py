@@ -8,20 +8,16 @@ from avionics_code.flight import telemetry_objects as t_o
 import time
 import asyncio
 import os
-import threading
 
 
 def main():
     """Launches the Avionics code"""
-
-    g_v.init_time = time.time()
 
     """Graphical User Interface object that allows to visualize
     the progress of the mission along with adding info to the
     mission profile for testing purposes, or issuing drop authorizations
     and emergency landing orders for real missions"""
     g_v.gui = g_u_i.GUI()
-    g_v.gui.activate()
 
     """This Server communications object handles communication with
     the auvsi suas server. It downloads the mission info to make a
@@ -37,8 +33,7 @@ def main():
     to call for the server comms to upload telemetry and the 
     mission controller to refresh the mission state or land
     if telemetry is not received."""
-    event_loop = asyncio.get_event_loop()
-    g_v.rf = rf_c.RFComs(event_loop)
+    g_v.rf = rf_c.RFComs(asyncio.get_event_loop())
 
     """This Mission profile object stores all the mission info
     provided by the competition's server (border, waypoint,
@@ -63,41 +58,29 @@ def main():
     g_v.th = t_o.TelemetryHistory()
 
     """initialization commands"""
+    # activate GUI
+    g_v.gui.activate()
     # connect to server
     g_v.sc.connect()
     # get mission from server
     g_v.sc.get_mission()
-    g_v.gui.to_draw["mission profile"] = True
     # create full mission in mission state
-    g_v.ms.launch_generate().join()
-    # connect to pixhawk
-    asyncio.get_event_loop().run_until_complete(g_v.rf.connect())
-    # set/upload plane parameters
-    asyncio.get_event_loop().run_until_complete(g_v.rf.set_vehicle_parameters())
-    # upload geofence to plane
-    asyncio.get_event_loop().run_until_complete(g_v.rf.upload_geofence())
-    # subscribe to plane telemetry
-    asyncio.ensure_future(g_v.rf.subscribe_to_telemetry())
-
-    """system loops"""
-    # start thread for refreshing mission state
-    threading.Thread(target=g_v.mc.refresh_mission_state_loop).start()
+    g_v.ms.launch_generate()
+    # connect to pixhawk and subscribe to telemetry
+    g_v.rf.launch_connect()
+    # start plane controller
+    g_v.mc.launch_controller()
 
     try:
-        event_loop.run_forever()
-        pass
+        asyncio.get_event_loop().run_forever()
     except KeyboardInterrupt:
         g_v.gui.close_request = True
         g_v.rf.close_request = True
         g_v.mc.close_request = True
+        time.sleep(1)
+        os._exit(1)
 
-        def closing():
-            time.sleep(1)
-            os._exit(1)
-
-        threading.Thread(target=closing).start()
 
 if __name__ == '__main__':
     # Start the main function
     main()
-

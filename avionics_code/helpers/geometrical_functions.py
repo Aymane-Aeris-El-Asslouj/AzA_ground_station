@@ -1,5 +1,6 @@
+from avionics_code.helpers import parameters as para
+
 import math
-import avionics_code.helpers.parameters as para
 
 FLOAT_DIFFERENCE_FOR_EQUALITY = para.FLOAT_DIFFERENCE_FOR_EQUALITY
 
@@ -131,6 +132,19 @@ def find_angle(vector_1, vector_2):
     else:
         angle = math.atan2(vector_2[1], vector_2[0]) - math.atan2(vector_1[1], vector_1[0])
         return clamp_angle(angle)
+
+
+def find_geometrical_angle(vector_1, vector_2):
+    """find angle between two vectors angle(vector_2)-angle(vector_1)"""
+
+    if norm(vector_1) == 0 or norm(vector_2) == 0:
+        return None
+    else:
+        angle = abs(math.atan2(vector_2[1], vector_2[0]) - math.atan2(vector_1[1], vector_1[0]))
+        if angle < math.pi:
+            return angle
+        else:
+            return 2 * math.pi - angle
 
 
 def line_from_points(point_1, point_2):
