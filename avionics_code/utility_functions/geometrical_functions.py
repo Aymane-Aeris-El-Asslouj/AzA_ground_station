@@ -1,8 +1,26 @@
-from avionics_code.helpers import parameters as para
+from avionics_code.references import parameters as para
 
 import math
 
 FLOAT_DIFFERENCE_FOR_EQUALITY = para.FLOAT_DIFFERENCE_FOR_EQUALITY
+
+
+def non_zero_3d_vec(vec):
+    """checks if a 2d vector is non_zero"""
+
+    return not float_eq_3d(vec, (0, 0, 0))
+
+
+def non_zero_2d_vec(vec):
+    """checks if a 2d vector is non_zero"""
+
+    return not float_eq_2d(vec, (0, 0))
+
+
+def non_zero_float(f):
+    """checks if a 2d vector is non_zero"""
+
+    return not float_eq(f, 0)
 
 
 def float_eq(f1, f2):
@@ -15,6 +33,12 @@ def float_eq_2d(p1, p2):
     """check 2d_float equality"""
     
     return math.hypot(p2[1] - p1[1], p2[0] - p1[0]) < FLOAT_DIFFERENCE_FOR_EQUALITY
+
+
+def float_eq_3d(p1, p2):
+    """check 3d_float equality"""
+
+    return math.hypot(p2[2] - p1[2], p2[1] - p1[1], p2[0] - p1[0]) < FLOAT_DIFFERENCE_FOR_EQUALITY
 
 
 def distance_2d(p1, p2):
@@ -48,6 +72,12 @@ def unit_vector(vector):
         return None
     else:
         return vector[0] / distance_2d(vector, (0, 0)), vector[1] / distance_2d(vector, (0, 0))
+
+
+def linear_vectors(fac1, vec_1, fac2, vec_2):
+    """linear combination of vectors"""
+
+    return fac1 * vec_1[0] + fac2 * vec_2[0], fac1 * vec_1[1] + fac2 * vec_2[1]
 
 
 def add_vectors(vector_1, vector_2):
@@ -558,3 +588,14 @@ def point_to_seg_projection(point, vertex_1, vertex_2):
         return vertex_1
     else:
         return vertex_2
+
+
+def rect_from_cen_size(center, width, height):
+    """returns corners of rectangle from
+    center, height, and width"""
+
+    pairs = [(1, 1), (-1, 1), (-1, -1), (1, -1)]
+    w = width
+    h = height
+    return [add_vectors(center, (pair[0] * w/2,
+                                 pair[1] * h / 2)) for pair in pairs]

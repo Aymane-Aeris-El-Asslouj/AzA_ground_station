@@ -1,6 +1,7 @@
-from avionics_code.helpers import global_variables as g_v, geography_functions as gg_f
-from avionics_code.helpers import parameters as para, geometrical_functions as g_f
-from avionics_code.helpers.global_variables import StandardStatus as SS
+from avionics_code.references import global_variables as g_v
+from avionics_code.references import parameters as para
+from avionics_code.utility_functions import geometrical_functions as g_f
+from avionics_code.utility_functions import geography_functions as gg_f
 
 import math
 import time
@@ -21,6 +22,8 @@ CRUISE_SPEED = para.CRUISE_SPEED
 ORBIT_VELOCITY = para.ORBIT_VELOCITY
 ORBIT_RADIUS = para.ORBIT_RADIUS
 
+SS = g_v.StandardStatus
+
 
 class RFComs:
     
@@ -34,7 +37,6 @@ class RFComs:
         
         # initial upload status
         self.parameters_status = SS.NONE
-        self.geofence_status = SS.NONE
         
         # mission status
         self.download_status = SS.NONE
@@ -72,9 +74,6 @@ class RFComs:
             # upload parameters
             await self.set_vehicle_parameters()
 
-            # upload geofence
-            await self.upload_geofence()
-
             # subscribe to telemetry
             await self.subscribe_to_telemetry()
 
@@ -89,13 +88,13 @@ class RFComs:
         asyncio.ensure_future(self.subscribe_to_connection(self.connection_index))
         self.lost_comms = False
 
-        g_v.gui.to_draw["system status"] = True
+        g_v.gui.to_draw("system status")
 
     async def set_vehicle_parameters(self):
         """sets all vehicle parameters after connecting/reconnecting"""
 
         self.parameters_status = SS.STARTED
-        g_v.gui.to_draw["system status"] = True
+        g_v.gui.to_draw("system status")
 
         # set parameters
         MAX_SPEED_M = MAX_SPEED/FEET_PER_METER
@@ -112,39 +111,7 @@ class RFComs:
             await self.set_vehicle_parameters()
 
         self.parameters_status = SS.SUCCESS
-        g_v.gui.to_draw["system status"] = True
-
-    async def upload_geofence(self):
-        """Upload geofence to plane"""
-
-        self.geofence_status = SS.STARTED
-        g_v.gui.to_draw["system status"] = True
-
-        # delete any previous geofence
-        try:
-            await self.pixhawk.geofence.clear_geofence()
-        except mavsdk.system.geofence.GeofenceError:
-            self.geofence_status = SS.FAILED
-            g_v.gui.display_message("geofence upload failed", "retrying...", 0)
-            await self.upload_geofence()
-
-        # Define geofence boundary
-        vertices_pos = [gg_f.cartesian_to_geo(vertex.pos) for vertex in g_v.mp.border.vertices]
-        vertices_pos = [geofence.Point(point[0], point[1]) for point in vertices_pos]
-
-        # Create a polygon object using vertex points
-        polygon = geofence.Polygon(vertices_pos, geofence.Polygon.FenceType.INCLUSION)
-
-        # Uploading the geofence
-        try:
-            await self.pixhawk.geofence.upload_geofence([polygon])
-        except mavsdk.system.geofence.GeofenceError:
-            self.geofence_status = SS.FAILED
-            g_v.gui.display_message("geofence upload failed", "retrying...", 0)
-            await self.upload_geofence()
-
-        self.geofence_status = SS.SUCCESS
-        g_v.gui.to_draw["system status"] = True
+        g_v.gui.to_draw("system status")
 
     async def subscribe_to_telemetry(self):
         """Gets position and velocity/attitude of plane"""
@@ -201,10 +168,10 @@ class RFComs:
                 # change connection status if needed
                 if data.is_connected and self.connection_status == 0:
                     self.connection_status = 1
-                    g_v.gui.to_draw["system status"] = True
+                    g_v.gui.to_draw("system status")
                 if not data.is_connected and self.connection_status == 1:
                     self.connection_status = 0
-                    g_v.gui.to_draw["system status"] = True
+                    g_v.gui.to_draw("system status")
 
         # reconnect if connection lost
         except grpc._channel._MultiThreadedRendezvous:
@@ -347,7 +314,7 @@ class RFComs:
         """download mission from pixhawk to update the mission state"""
 
         self.download_status = SS.STARTED
-        g_v.gui.to_draw["system status"] = True
+        g_v.gui.to_draw("system status")
 
         # check if connection data is received
         if self.connection_status == 0:
@@ -407,7 +374,7 @@ class RFComs:
                     await self.connect()
             else:
                 self.download_status = SS.SUCCESS
-                g_v.gui.to_draw["system status"] = True
+                g_v.gui.to_draw("system status")
 
     def launch_upload_mission(self):
         """start async mission uploading"""
@@ -428,13 +395,35 @@ class RFComs:
         """upload mission to pixhawk"""
 
         self.upload_status = SS.STARTED
-        g_v.gui.to_draw["system status"] = True
+        g_v.gui.to_draw("system status")
 
         # check if connection data is received
         if self.connection_status == 0:
             self.upload_status = SS.FAILED
             g_v.gui.display_message("can't upload mission,", "no connection", 0)
         else:
+
+            # Define geofence boundary
+            vertices_pos = [gg_f.cartesian_to_geo(vertex.pos) for vertex in g_v.mp.border.vertices]
+            vertices_pos = [geofence.Point(point[0], point[1]) for point in vertices_pos]
+
+            # Create a polygon object using vertex points
+            polygon = geofence.Polygon(vertices_pos, geofence.Polygon.FenceType.INCLUSION)
+
+            # Uploading the geofence
+            try:
+                await self.pixhawk.geofence.upload_geofence([polygon])
+            except mavsdk.system.geofence.GeofenceError as err:
+                error = str(err._result.result)
+                self.upload_status = SS.FAILED
+                g_v.gui.display_message("can't upload geofence,", error, 0)
+            except grpc._channel._MultiThreadedRendezvous:
+                self.upload_status = SS.FAILED
+                g_v.gui.display_message("can't upload geofence,", "connection lost, reconnecting...", 0)
+                if not self.lost_comms:
+                    self.lost_comms = True
+                    await self.connect()
+
             # clear previous mission
             try:
                 await self.pixhawk.mission_raw.clear_mission()
@@ -536,7 +525,7 @@ class RFComs:
                         await self.connect()
                 else:
                     self.upload_status = SS.SUCCESS
-                    g_v.gui.to_draw["system status"] = True
+                    g_v.gui.to_draw("system status")
 
     def launch_start_mission(self):
         """start async mission starting"""
@@ -563,7 +552,7 @@ class RFComs:
         """start flight mission"""
 
         self.mission_start = SS.STARTED
-        g_v.gui.to_draw["system status"] = True
+        g_v.gui.to_draw("system status")
 
         # check if arming data is received
         if not g_v.th.armed.data_received():
@@ -600,7 +589,7 @@ class RFComs:
                         await self.connect()
                 else:
                     self.mission_start = SS.SUCCESS
-                    g_v.gui.to_draw["system status"] = True
+                    g_v.gui.to_draw("system status")
 
     def launch_pause_mission(self):
         """start async mission stopping"""
@@ -620,7 +609,7 @@ class RFComs:
         """pause flight mission"""
 
         self.mission_pause = SS.STARTED
-        g_v.gui.to_draw["system status"] = True
+        g_v.gui.to_draw("system status")
 
         # check if flight_mode data is received
         if not g_v.th.flight_mode.data_received():
@@ -643,7 +632,7 @@ class RFComs:
                         await self.connect()
                 else:
                     self.mission_pause = SS.SUCCESS
-                    g_v.gui.to_draw["system status"] = True
+                    g_v.gui.to_draw("system status")
             else:
                 self.mission_pause = SS.FAILED
                 g_v.gui.display_message("can't pause mission,", "vehicle is not in mission mode", 0)
@@ -667,7 +656,7 @@ class RFComs:
         """start go to position"""
 
         self.go_to_status = SS.STARTED
-        g_v.gui.to_draw["system status"] = True
+        g_v.gui.to_draw("system status")
 
         # check if arming data is received
         if not g_v.th.in_air.data_received():
@@ -695,7 +684,7 @@ class RFComs:
                         await self.connect()
                 else:
                     self.go_to_status = SS.SUCCESS
-                    g_v.gui.to_draw["system status"] = True
+                    g_v.gui.to_draw("system status")
 
             else:
                 self.go_to_status = SS.FAILED

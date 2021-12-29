@@ -1,6 +1,12 @@
 import math
 
 
+def inv_rgb(color):
+    """inverts RGB color"""
+
+    return 255-color[0], 255-color[1], 255-color[2]
+
+
 def clamp(v):
     """confine a color to rgb spectrum"""
 

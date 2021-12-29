@@ -15,12 +15,16 @@ MAP_REF = {
 # Dashboard parameters
 DASHBOARD_SIZE = 650  # default 650 (in pixels) size of dashboard
 FRAMES_PER_SECOND = 30  # (default 30) frames per second for the dashboard
-REGULAR_UPDATE_PER_SECOND = 1  # (default 1) full display updates per second
+REGULAR_UPDATES_PER_SECOND = 1  # (default 1) full display updates per second
 WAYPOINT_SIZE = 4  # (in pixels) size of waypoints on dashboard
 DEFAULT_MAP_SIZE = 6000  # (ft) map size * don't change it cause the background doesn't scale with it*
 ARROW_HEAD_SIZE = 10  # (ft) size of arrow heads
 PATH_COLORING_CYCLE = 40  # length of coloring cycle in waypoints for shown path
 MESSAGE_DISPLAY_PERIOD = 3  # (s) period for which a message is displayed as new on screen
+FONT_SIZE = 14
+FONT_TYPE = "Arial"
+ZOOM_RATIO = 4/3
+ZOOM_MAX = 5
 
 # RF comms parameters
 RF_TELEMETRY_RATE = 1  # (Hz) telemetry request rate for pixhawk, actual rate may vary
@@ -49,7 +53,7 @@ LANDING_COORDINATES = {
 }
 
 # CV/Hardware parameters
-CV_IMAGE_GROUND_SIZE = 37.5  # (ft) side of the ground square area covered by CV's camera
+CV_IMAGE_GROUND_SIZE = 50  # (ft) side of the ground square area covered by CV's camera
 OFF_AXIS_IMAGING_RANGE = 350  # (ft) ground range of off-axis imaging
 AIR_DROP_ALTITUDE = 200.0  # (ft) altitude for airdrop
 IMAGING_ALTITUDE = 200.0  # (ft) altitude for imaging

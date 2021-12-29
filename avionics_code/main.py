@@ -1,8 +1,9 @@
-from avionics_code.communications import rf_communications as rf_c, server_communications as s_c
+from avionics_code.communications import rf_communications as rf_c
+from avionics_code.communications import server_communications as s_c
 from avionics_code.mission import mission_control as m_c, mission_state as m_s
 from avionics_code.mission import mission_profile as m_p
-from avionics_code.gui import graphical_user_interface as g_u_i
-import avionics_code.helpers.global_variables as g_v
+from avionics_code.avionics_gui import avionics_gui as a_g
+from avionics_code.references import global_variables as g_v
 from avionics_code.flight import telemetry_objects as t_o
 
 import time
@@ -17,7 +18,7 @@ def main():
     the progress of the mission along with adding info to the
     mission profile for testing purposes, or issuing drop authorizations
     and emergency landing orders for real missions"""
-    g_v.gui = g_u_i.GUI()
+    g_v.gui = a_g.AvionicsGUI()
 
     """This Server communications object handles communication with
     the auvsi suas server. It downloads the mission info to make a
@@ -60,14 +61,17 @@ def main():
     """initialization commands"""
     # activate GUI
     g_v.gui.activate()
+
     # connect to server
     g_v.sc.connect()
     # get mission from server
     g_v.sc.get_mission()
     # create full mission in mission state
     g_v.ms.launch_generate()
+
     # connect to pixhawk and subscribe to telemetry
     g_v.rf.launch_connect()
+
     # start plane controller
     g_v.mc.launch_controller()
 

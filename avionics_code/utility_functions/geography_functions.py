@@ -1,4 +1,5 @@
-from avionics_code.helpers import geometrical_functions as g_f, parameters as para
+from avionics_code.references import parameters as para
+from avionics_code.utility_functions import geometrical_functions as g_f
 
 import utm
 

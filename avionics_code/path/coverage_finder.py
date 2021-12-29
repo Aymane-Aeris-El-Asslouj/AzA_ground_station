@@ -1,5 +1,8 @@
-from avionics_code.helpers import geometrical_functions as g_f, parameters as para
-from avionics_code.helpers import global_variables as g_v
+from avionics_code.references import parameters as para
+from avionics_code.utility_functions import geometrical_functions as g_f
+from avionics_code.references import global_variables as g_v
+
+import time
 
 WEIGHT_OF_ANGLE_SCOUT = para.WEIGHT_OF_ANGLE_SCOUT
 BIAS_OF_ANGLE_SCOUT = para.BIAS_OF_ANGLE_SCOUT
@@ -9,6 +12,7 @@ WEIGHT_OF_ANGLE_OFF = para.WEIGHT_OF_ANGLE_OFF
 BIAS_OF_ANGLE_OFF = para.BIAS_OF_ANGLE_OFF
 WEIGHT_OF_DISTANCE_OFF = para.WEIGHT_OF_DISTANCE_OFF
 BIAS_OF_DISTANCE_OFF = para.BIAS_OF_DISTANCE_OFF
+FRAMES_PER_SECOND = para.FRAMES_PER_SECOND
 
 
 def cover(waypoint_array, plane_pos, off_axis=False):
@@ -41,15 +45,25 @@ def cover(waypoint_array, plane_pos, off_axis=False):
         last_pos = min(cell_array, key=lambda x: x[0])
         last_pos_2 = last_pos
 
+    start_time = time.time()
+
     # add closest cell to list of cells to travel then delete it from array
     for index in range(len(waypoint_array)):
 
+        # sleep to allow other threads to run
+        if (time.time() - start_time) > 1/FRAMES_PER_SECOND:
+            g_v.gui.to_draw("system status")
+            time.sleep(1/FRAMES_PER_SECOND)
+        start_time = time.time()
+
         # update screen percentage
-        g_v.gui.cover_percentage = 100 * (index/initial_array_size)
-        g_v.gui.to_draw["system status"] = True
+        completion = 100 * (index/initial_array_size)
+        g_v.gui.layers["system status"].cover_percentage = completion
+        g_v.gui.to_draw("system status")
 
         # pre-check before full cell cost computation
         found_cell = False
+        next_cell = None
         if index > 0 and not off_axis:
 
             # if they have the two previous cells have the same y position

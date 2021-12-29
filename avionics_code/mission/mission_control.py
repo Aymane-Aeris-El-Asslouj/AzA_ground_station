@@ -1,7 +1,8 @@
-from avionics_code.path import path_functions as p_f, path_objects as p_o
-from avionics_code.helpers import global_variables as g_v, geometrical_functions as g_f
-from avionics_code.helpers import parameters as para
-from avionics_code.helpers.global_variables import ControllerStatus as CS
+from avionics_code.path import path_functions as p_f
+from avionics_code.path import path_objects as p_o
+from avionics_code.references import global_variables as g_v
+from avionics_code.references import parameters as para
+from avionics_code.utility_functions import geometrical_functions as g_f
 
 import threading
 import time
@@ -13,6 +14,10 @@ MISSION_STATE_REFRESH_RATE = para.MISSION_STATE_REFRESH_RATE
 PREFERRED_TURN_RADIUS = para.PREFERRED_TURN_RADIUS
 LANDING_LOITER_COORDINATES = para.LANDING_LOITER_COORDINATES
 
+M_S_R_R = MISSION_STATE_REFRESH_RATE
+
+CS = g_v.ControllerStatus
+
 
 class MissionControl:
     """stores computed path and manipulates it"""
@@ -21,22 +26,22 @@ class MissionControl:
 
         # current path to be sent/that was sent to the plane
         self.chosen_path = None
-
         self.stripped_path = None
-
         self.exportable_chosen_path = None
 
+        # computation status of the path
         self.path_computation_status = g_v.StandardStatus.NONE
 
-        self.close_request = False
-
+        # coms variables
         self.lost_con = False
         self.first_connection = True
         self.rf_lost_comms = False
 
+        # controller state
         self.action = CS.WAIT_CONNECTION
         self.waypoint_list_update = False
 
+        # requests
         self.land_requested = False
 
         self.pre_existing_flight = False
@@ -47,17 +52,19 @@ class MissionControl:
         threading.Thread(target=self.plane_controller_loop).start()
 
     def plane_controller_loop(self):
-        """Refreshes mission state by checking if a new waypoint was reached,
-        then checks if the plane path needs to be recomputed or if time ran out"""
+        """Refreshes mission state by checking if a new
+        waypoint was reached, then checks if the plane path
+        needs to be recomputed or if time ran out"""
 
         last_time = time.time()
         while True:
-            # keep the frame rate under or equal to FRAMES_PER_SECOND
+            # keep the refresh rate under or equal
+            # to MISSION_STATE_REFRESH_RATE
             new_time = time.time()
-            time.sleep(abs(1 / MISSION_STATE_REFRESH_RATE - (new_time - last_time)))
+            time.sleep(abs(1 / M_S_R_R - (new_time - last_time)))
             last_time = time.time()
 
-            if self.close_request or g_v.ms.generation_status == g_v.StandardStatus.FAILED:
+            if g_v.close_request or g_v.ms.generation_status == g_v.StandardStatus.FAILED:
                 break
 
             # update mission waypoints if needed
@@ -70,7 +77,7 @@ class MissionControl:
                 self.action = CS.WAIT_CONNECTION
                 self.waypoint_list_update = False
 
-            # check if a new connection has been establish
+            # check if a new connection has been established
             if self.lost_con and g_v.rf.connection_status == 1:
                 if self.first_connection:
                     self.first_connection = False
@@ -148,7 +155,13 @@ class MissionControl:
         if self.action == CS.WAIT_REQUESTS:
             self.land_requested = True
         else:
-            g_v.gui.display_message("cannot land,", "controller is busy", 0)
+            self.busy_message()
+
+    @staticmethod
+    def busy_message():
+        """displays controller is busy in GUI"""
+
+        g_v.gui.display_message("controller is busy", "retry later", 0)
 
     @staticmethod
     def update_waypoint_status_list():
@@ -173,15 +186,15 @@ class MissionControl:
                 if g_f.distance_3d(plane_3d_pos, active_waypoint_3d_pos) < acceptance_radius:
                     # deactivate waypoint
                     active_waypoint.is_mission = 0
-                    g_v.gui.to_draw["mission state"] = True
-                    g_v.gui.to_draw["path"] = True
+                    g_v.gui.to_draw("mission state")
+                    g_v.gui.to_draw("path")
 
     def launch_compute_path(self):
-        """starts path computation if it not already running, returns thread"""
+        """starts path computation if it's not already running, returns thread"""
 
         # check that path computation is not ongoing
         if self.path_computation_status != g_v.StandardStatus.STARTED:
-            new_thread = threading.Thread(target=self.compute_path())
+            new_thread = threading.Thread(target=self.compute_path)
             new_thread.start()
             return new_thread
         else:
@@ -265,8 +278,8 @@ class MissionControl:
         self.exportable_chosen_path = p_o.Path(flattened_waypoint_list)
 
         self.path_computation_status = g_v.StandardStatus.SUCCESS
-        g_v.gui.to_draw["system status"] = True
-        g_v.gui.to_draw["path"] = True
+        g_v.gui.to_draw("system status")
+        g_v.gui.to_draw("path")
 
     @staticmethod
     def smart_path_finder(heading, plane_pos, plane_z, way_list, profile):
@@ -277,7 +290,7 @@ class MissionControl:
         if len(way_list) == 0:
             return False, -1
 
-        start_point = p_o.Waypoint(0, plane_pos, plane_z, is_mission=0)
+        start_point = p_o.Waypoint(g_v.MissionType.PLANE, plane_pos, plane_z, is_mission=0)
 
         # add inertia post turn waypoint
         heading_vec = g_f.rotate_vector((PREFERRED_TURN_RADIUS, 0), heading)

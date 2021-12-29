@@ -1,4 +1,4 @@
-from avionics_code.helpers import global_variables as g_v, parameters as para
+from avionics_code.references import global_variables as g_v, parameters as para
 
 import time
 
@@ -34,7 +34,7 @@ class TelemetryObject:
         self.telemetry_rate = telemetry_rate
         self.telemetry_time = telemetry_time
         self.data = data
-        g_v.gui.to_draw["telemetry"] = True
+        g_v.gui.to_draw("telemetry")
 
     def data_received(self):
         """checks if telemetry data has been received"""

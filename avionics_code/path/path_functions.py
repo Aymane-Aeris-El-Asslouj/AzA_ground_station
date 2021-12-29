@@ -1,6 +1,6 @@
 from avionics_code.path import path_objects as p_o
-from avionics_code.helpers import parameters as para, global_variables as g_v
-from avionics_code.helpers import geometrical_functions as g_f
+from avionics_code.references import parameters as para, global_variables as g_v
+from avionics_code.utility_functions import geometrical_functions as g_f
 
 PATHS_PER_WAYPOINTS = para.PATHS_PER_WAYPOINTS
 MAX_ATTEMPTS_PER_WAYPOINTS = para.MAX_ATTEMPTS_PER_WAYPOINTS
@@ -14,8 +14,9 @@ def recursive_path_search(path_to_now, waypoint_list, profile, depth, full_list)
     in altitude to make sure it is valid, if not, switch to another found path
     or return that the previously found path needs to be rebuilt"""
 
-    g_v.gui.path_search_percentage = 100 * (1 - len(waypoint_list)/len(full_list))
-    g_v.gui.to_draw["system status"] = True
+    completion = 100 * (1 - len(waypoint_list)/len(full_list))
+    g_v.gui.layers["system status"].path_search_percentage = completion
+    g_v.gui.to_draw("system status")
 
     # max depth reached in the search
     local_depth = depth
