@@ -11,7 +11,7 @@ Python code that handles server/plane communications and autonomous flying of th
 + Allow for visualization of the map, mission, flight, and system status
 
 #### level 0 diagram
-![doc/Avionics code diagram level 0.jpg](doc/Avionics code diagram level 0.jpg)
+![doc/Avionics code diagram level 0.jpg](doc/Avionics_code_diagram_level_0.jpg)
 
 ### Structure of the code
 + Server Comms requests the map and mission information from the server and stores it in Mission Profile
@@ -23,13 +23,13 @@ Python code that handles server/plane communications and autonomous flying of th
 + Commands are handled by Mission Control through a queue system. Commands include both inner commands like path generation and plane commands like start/pause mission which are sent through RF Comms
 
 #### level 1 diagram
-![doc/Avionics code diagram level 1.jpg](doc/Avionics code diagram level 1.jpg)
+![doc/Avionics code diagram level 1.jpg](doc/Avionics_code_diagram_level_1.jpg)
 
 #### Mission Stages : Mission Profile - Mission State - Mission Control's final path
-![doc/Mission stages.jpg](doc/Mission stages.jpg)
+![doc/Mission stages.jpg](doc/Mission_stages.jpg)
 
 ### GUI (Made with PyGame)
-![doc/Avionics gui.jpg](doc/Avionics gui.jpg)
+![doc/Avionics gui.jpg](doc/Avionics_gui.jpg)
 
 ### Algorithms
 
