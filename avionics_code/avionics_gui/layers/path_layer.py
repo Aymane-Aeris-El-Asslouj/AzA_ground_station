@@ -5,7 +5,7 @@ from avionics_code.utility_functions import algebraic_functions as a_f
 from avionics_code.pygui import layer as g_l
 from avionics_code.pygui import colors as col
 
-from .. import drawing_functions as d_f
+from avionics_code.avionics_gui import drawing_functions as d_f
 
 import pygame
 import math
@@ -56,7 +56,8 @@ class PathLayer(g_l.Layer):
             for index, way in enumerate(chosen_path):
 
                 # check when the first active waypoint is reached
-                if way.is_mission == 1 and not active_reached:
+                act = way.is_mission == g_v.Activity.ACTIVE
+                if act and not active_reached:
                     active_reached = True
 
                 MT = g_v.MissionType
@@ -74,7 +75,7 @@ class PathLayer(g_l.Layer):
                 if inactive_waypoints or active_reached:
 
                     # draw the waypoint if its mission type is displayed
-                    if trans[way.mission_index] and pre_way is not None:
+                    if trans[way.mission_type] and pre_way is not None:
 
                         # get the color of the waypoint
                         color_factor = index / PATH_COLORING_CYCLE

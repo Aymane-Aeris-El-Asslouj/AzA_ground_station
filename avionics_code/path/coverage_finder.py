@@ -14,6 +14,8 @@ WEIGHT_OF_DISTANCE_OFF = para.WEIGHT_OF_DISTANCE_OFF
 BIAS_OF_DISTANCE_OFF = para.BIAS_OF_DISTANCE_OFF
 FRAMES_PER_SECOND = para.FRAMES_PER_SECOND
 
+SLEEP_THREADS = para.SLEEP_THREADS
+
 
 def cover(waypoint_array, plane_pos, off_axis=False):
     """Finds a path that covers all waypoints in list on a map"""
@@ -36,10 +38,12 @@ def cover(waypoint_array, plane_pos, off_axis=False):
 
         def check_edge(x):
             f_q = g_f.float_eq
-            return f_q(x[0], min_x) or f_q(x[0], max_x) or f_q(x[1], min_y) or f_q(x[1], max_y)
+            return (f_q(x[0], min_x) or f_q(x[0], max_x)
+                    or f_q(x[1], min_y) or f_q(x[1], max_y))
 
         edge_cells.extend(filter(check_edge, cell_array))
-        last_pos = min(edge_cells, key=lambda x: g_f.distance_2d(x, plane_pos))
+        dis = g_f.distance_2d
+        last_pos = min(edge_cells, key=lambda x: dis(x, plane_pos))
 
     else:
         last_pos = min(cell_array, key=lambda x: x[0])
@@ -47,60 +51,76 @@ def cover(waypoint_array, plane_pos, off_axis=False):
 
     start_time = time.time()
 
-    # add closest cell to list of cells to travel then delete it from array
-    for index in range(len(waypoint_array)):
+    # add closest cell to list of cells to travel
+    # then delete it from array
+    index = 0
+    len_array = len(waypoint_array)
+    while index < len_array:
 
-        # sleep to allow other threads to run
-        if (time.time() - start_time) > 1/FRAMES_PER_SECOND:
-            g_v.gui.to_draw("system status")
-            time.sleep(1/FRAMES_PER_SECOND)
-        start_time = time.time()
+        if SLEEP_THREADS:
+            # sleep to allow other threads to run
+            if (time.time() - start_time) > 0.4 / FRAMES_PER_SECOND:
+                time.sleep(1/FRAMES_PER_SECOND)
+            start_time = time.time()
 
         # update screen percentage
         completion = 100 * (index/initial_array_size)
         g_v.gui.layers["system status"].cover_percentage = completion
-        g_v.gui.to_draw("system status")
 
         # pre-check before full cell cost computation
         found_cell = False
         next_cell = None
+        extra = []
         if index > 0 and not off_axis:
 
-            # if they have the two previous cells have the same y position
+            # if they have the two previous cells
+            # have the same y position
             if g_f.float_eq(last_pos[1], last_pos_2[1]):
 
                 # get cells with same y pos
-                sub_array = filter(lambda x: g_f.float_eq(last_pos[1], x.pos[1]), waypoint_array)
-                # get the ones that are on the side of the current cell in the x direction
+                sub_array = filter(
+                    lambda x: g_f.float_eq(last_pos[1], x.pos[1]), waypoint_array)
+                # get the ones that are on the side of
+                # the current cell in the x direction
                 if last_pos[0] > last_pos_2[0]:
-                    sub_array_2 = list(filter(lambda x: x.pos[0] > last_pos[0], sub_array))
+                    sub_array_2 = list(filter(
+                        lambda x: x.pos[0] > last_pos[0], sub_array))
                     # get the closest one
                     if len(sub_array_2) > 0:
-                        next_cell = min(sub_array_2, key=lambda x: x.pos[0])
+                        sub_array_2.sort(key=lambda x: x.pos[0])
+                        extra = sub_array_2
                         found_cell = True
                 else:
-                    sub_array_2 = list(filter(lambda x: x.pos[0] < last_pos[0], sub_array))
+                    sub_array_2 = list(filter(
+                        lambda x: x.pos[0] < last_pos[0], sub_array))
                     # get the closest one
                     if len(sub_array_2) > 0:
-                        next_cell = max(sub_array_2, key=lambda x: x.pos[0])
+                        sub_array_2.sort(key=lambda x: x.pos[0], reverse=True)
+                        extra = sub_array_2
                         found_cell = True
 
             # if they have the two previous cells have the same x position
             if g_f.float_eq(last_pos[0], last_pos_2[0]):
                 # get cells with same x pos
-                sub_array = filter(lambda x: g_f.float_eq(last_pos[0], x.pos[0]), waypoint_array)
-                # get the ones that are on the side of the current cell in the y direction
+                sub_array = filter(lambda x: g_f.float_eq(
+                    last_pos[0], x.pos[0]), waypoint_array)
+                # get the ones that are on the side of the
+                # current cell in the y direction
                 if last_pos[1] > last_pos_2[1]:
-                    sub_array_2 = list(filter(lambda x: x.pos[1] > last_pos[1], sub_array))
+                    sub_array_2 = list(filter(
+                        lambda x: x.pos[1] > last_pos[1], sub_array))
                     # get the closest one
                     if len(sub_array_2) > 0:
-                        next_cell = min(sub_array_2, key=lambda x: x.pos[1])
+                        sub_array_2.sort(key=lambda x: x.pos[1])
+                        extra = sub_array_2
                         found_cell = True
                 else:
-                    sub_array_2 = list(filter(lambda x: x.pos[1] < last_pos[1], sub_array))
+                    sub_array_2 = list(filter(
+                        lambda x: x.pos[1] < last_pos[1], sub_array))
                     # get the closest one
                     if len(sub_array_2) > 0:
-                        next_cell = max(sub_array_2, key=lambda x: x.pos[1])
+                        sub_array_2.sort(key=lambda x: x.pos[1], reverse=True)
+                        extra = sub_array_2
                         found_cell = True
 
             if not found_cell:
@@ -109,26 +129,56 @@ def cover(waypoint_array, plane_pos, off_axis=False):
                         return False
                     if p2[1] > p1[1] and p1[1] < p[1]:
                         return False
-                    return g_f.float_eq((p[1] - p1[1]) * (p2[0] - p1[0]) - (p2[1] - p1[1]) * (p[0] - p1[0]), 0)
+                    c1 = (p[1] - p1[1]) * (p2[0] - p1[0])
+                    c2 = (p2[1] - p1[1]) * (p[0] - p1[0])
+                    g_f.float_eq(c1 - c2, 0)
 
                 # get cells with same movement ratio
-                sub_array = filter(lambda x: check_cross(last_pos, x.pos, last_pos_2), waypoint_array)
-                # get the ones that are on the side of the current cell in the x direction
-                try:
-                    next_cell = min(sub_array, key=lambda x: cell_cost(last_pos_2, last_pos, x.pos, off_axis))
-                    found_cell = True
-                except ValueError:
-                    pass
+                sub_array = list(filter(lambda x: check_cross(
+                    last_pos, x.pos, last_pos_2), waypoint_array))
+                # get the ones that are on the side of the
+                # current cell in the x direction
+                if len(sub_array) > 0:
+
+                    # filter to only keep the cells with
+                    # the right positioning
+                    if last_pos[0] > last_pos_2[0]:
+                        sub_array_2 = list(filter(
+                            lambda x: x.pos[0] > last_pos[0], sub_array))
+                        # get the closest one
+                        if len(sub_array_2) > 0:
+                            sub_array_2.sort(key=lambda x: x.pos[0])
+                            extra = sub_array_2
+                            found_cell = True
+                    else:
+                        sub_array_2 = list(filter(
+                            lambda x: x.pos[0] < last_pos[0], sub_array))
+                        # get the closest one
+                        if len(sub_array_2) > 0:
+                            sub_array_2.sort(key=lambda x: x.pos[0], reverse=True)
+                            extra = sub_array_2
+                            found_cell = True
+
+        # add all extra elements
+        for element in extra:
+            path.append(element)
+            waypoint_array.remove(element)
+            last_pos_2 = last_pos
+            last_pos = element.pos
+            index += 1
+
+        if len(waypoint_array) == 0:
+            break
 
         # full cell cost computation
-        if not found_cell:
-            next_cell = min(waypoint_array, key=lambda x: cell_cost(last_pos_2, last_pos, x.pos, off_axis))
+        next_cell = min(waypoint_array, key=lambda x: cell_cost(
+            last_pos_2, last_pos, x.pos, off_axis))
 
         path.append(next_cell)
-        del waypoint_array[waypoint_array.index(next_cell)]
+        waypoint_array.remove(next_cell)
         last_pos_2 = last_pos
         last_pos = next_cell.pos
-
+        index += 1
     return path
 
 
@@ -156,7 +206,8 @@ def cell_cost(cell_0, cell_1, cell_2, off_axis):
     cell_0_to_1 = g_f.sub_vectors(cell_1, cell_0)
     cell_1_to_2 = g_f.sub_vectors(cell_2, cell_1)
 
-    if g_f.float_eq_2d(cell_0_to_1, (0, 0)) or g_f.float_eq_2d(cell_1_to_2, (0, 0)):
+    if (g_f.float_eq_2d(cell_0_to_1, (0, 0))
+            or g_f.float_eq_2d(cell_1_to_2, (0, 0))):
         angle_change = 0
     else:
         angle_change = g_f.find_angle(cell_0_to_1, cell_1_to_2)

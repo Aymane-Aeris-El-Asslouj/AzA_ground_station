@@ -5,7 +5,7 @@ from avionics_code.utility_functions import geography_functions as gg_f
 from avionics_code.pygui import layer as g_l
 from avionics_code.pygui import colors as col
 
-from .. import drawing_functions as d_f
+from avionics_code.avionics_gui import drawing_functions as d_f
 
 import pygame
 import math
@@ -221,16 +221,6 @@ class MPDragAndDrop(g_l.DragAndDrop):
     def mouse_button_down(self, event, cur_pos):
         """react to mouse button down event"""
 
-        # disallow map inputs if the mission started
-        if g_v.mc is None:
-            self.layer.g_u_i.display_message("controller is busy",
-                                             "retry later", 0)
-            return
-        if g_v.mc.action != g_v.ControllerStatus.WAIT_REQUESTS:
-            self.layer.g_u_i.display_message("controller is busy",
-                                             "retry later", 0)
-            return
-
         # check activation status
         settings = self.layer.g_u_i.settings
         if not settings[self.settings_name[self.key]]["activated"]:
@@ -245,10 +235,22 @@ class MPDragAndDrop(g_l.DragAndDrop):
         # start being dragged if clicked on considering zoom
         if event.button == 1:
             if g_f.distance_2d(cur_pos, self.pos) < self.size * zoom:
-                self.shine = 5
-                self.dragged = True
-                self.initial_cur_pos = cur_pos
-                self.initial_pos = self.pos
+
+                # check if controller is busy
+                if not self.layer.g_u_i.is_controller_busy():
+
+                    # check if plane on ground
+                    if g_v.th is None:
+                        return
+                    if not g_v.th.in_air.data_received():
+                        return
+                    if g_v.th.in_air.data["in air"]:
+                        return
+
+                    self.shine = 5
+                    self.dragged = True
+                    self.initial_cur_pos = cur_pos
+                    self.initial_pos = self.pos
 
     def mouse_button_up(self, event, cur_pos):
         """react to button up event"""

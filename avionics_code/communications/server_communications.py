@@ -13,17 +13,14 @@ class ServerComs:
         """Connects to competition server"""
 
         self.connection_status = g_v.StandardStatus.STARTED
-        g_v.gui.to_draw("system status")
 
         self.connection_status = g_v.StandardStatus.SUCCESS
-        g_v.gui.to_draw("system status")
 
     def get_mission(self):
         """Gets mission info as a json file from the server
         and turns it into a mission profile object"""
 
         self.retrieval_status = g_v.StandardStatus.STARTED
-        g_v.gui.to_draw("system status")
 
         with open("extra files/data.json") as f:
             data = json.load(f)
@@ -31,7 +28,6 @@ class ServerComs:
             g_v.gui.to_draw("mission profile")
 
         self.retrieval_status = g_v.StandardStatus.SUCCESS
-        g_v.gui.to_draw("system status")
 
     def upload_telemetry(self, flight_profile):
         #print("\nfake telemetry upload")

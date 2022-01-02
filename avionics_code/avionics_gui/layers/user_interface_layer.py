@@ -7,9 +7,14 @@ from avionics_code.utility_functions import geometrical_functions as g_f
 import pygame
 
 DASHBOARD_SIZE = para.DASHBOARD_SIZE
+D_S = DASHBOARD_SIZE
 WAYPOINT_SIZE = para.WAYPOINT_SIZE
 W_S = WAYPOINT_SIZE
-D_S = DASHBOARD_SIZE
+ORBIT_RADIUS = para.ORBIT_RADIUS
+O_R = ORBIT_RADIUS
+
+CS = g_v.ControllerStatus
+MT = g_v.MessageType
 
 WHITE = col.WHITE
 BLACK = col.BLACK
@@ -46,6 +51,11 @@ class UserInterfaceLayer(g_l.Layer):
 
         # function that returns the appropriate mission profile function
         def mp_func(name_i):
+
+            # check if controller is busy
+            if self.g_u_i.is_controller_busy():
+                return
+
             mp_funcs = {
                 "button input waypoints": g_v.mp.clear_waypoints,
                 "button input obstacles": g_v.mp.clear_obstacles,
@@ -71,7 +81,8 @@ class UserInterfaceLayer(g_l.Layer):
             "airdrop": (PURPLE, 1.03, 3.5, 2, "Airdrop"),
             "airdrop goal": (PURPLE, 1.03, 4.0, 2, "Airdrop Goal"),
             "lost comms": (WHITE, 1.03, 4.5, 2, "Lost comms"),
-            "emergent": (DARK_GREEN, 1.03, 5.0, 2, "Emergent obj")
+            "emergent": (DARK_GREEN, 1.03, 5.0, 2, "Emergent obj"),
+            "go to": (BLACK, 1.03, 13.0, 2, "go to position")
         }
 
         # middle click actions
@@ -118,7 +129,7 @@ class UserInterfaceLayer(g_l.Layer):
             "trajectory": (WHITE, 1.03, 9.5, 2, "Trajectory", l_4),
             "waypoints": (DARK_CYAN, 1.03, 10.0, 2, "Waypoints", l_3),
             "imaging": (DARK_CYAN, 1.03, 10.5, 2, "Imaging", l_3),
-            "off axis": (DARK_CYAN, 1.03, 11.0, 2, "Off axis", l_3)
+            "off axis": (DARK_CYAN, 1.03, 11.0, 2, "Off axis", l_3),
         }
 
         # add toggle menu buttons
@@ -131,19 +142,36 @@ class UserInterfaceLayer(g_l.Layer):
                              b_i[4], key, (b_i[5], ()))
             self.layer_objects[key] = button_obj
 
-        #
+        # button actions
         def l_action(name_i):
+
             left_click_funcs = {
-                "button action generate": g_v.ms.launch_generate,
-                "button action compute": g_v.mc.launch_compute_path,
-                "button action upload": g_v.rf.launch_upload_mission,
-                "button action start": g_v.rf.launch_start_mission,
-                "button action pause": g_v.rf.launch_pause_mission,
-                "button action go to": (BLACK, 1.03, 13.0, 2, "go to position"),
-                "button action land": g_v.mc.land_request,
+                "button action generate": CS.GENERATE_MISSION,
+                "button action compute": CS.COMPUTE_PATH,
+                "button action upload": CS.UPLOAD_MISSION,
+                "button action start": CS.START_MISSION,
+                "button action pause": CS.PAUSE_MISSION,
+                "button action land": CS.LAND,
+                "button action camera gimbal": CS.CAMERA_GIMBAL_COMMAND
                 #"button action drop authorization": (BLACK, 1.03, 14.0, 2, "drop UGV")
             }
-            left_click_funcs[name_i]()
+
+            # mission generation is disabled during flights
+            if (name_i == "button action generate"
+                    or name_i == "button action compute"
+                    or name_i == "button action upload"):
+
+                # check if plane on ground
+                if g_v.th is None:
+                    return
+                if not g_v.th.in_air.data_received():
+                    return
+                if g_v.th.in_air.data["in air"]:
+                    self.g_u_i.display_message("not available mid-air",
+                                               "", MT.CONTROLLER)
+                    return
+
+            g_v.mc.queue.append(left_click_funcs[name_i])
 
         # default dictionary of control menu buttons
         buttons = {
@@ -152,8 +180,8 @@ class UserInterfaceLayer(g_l.Layer):
             "upload": (BLACK, 1.03, 6.75, 2, "Upload mission"),
             "start": (BLACK, 1.03, 12.0, 2, "Start mission"),
             "pause": (BLACK, 1.03, 12.5, 2, "Pause mission"),
-            "go to": (BLACK, 1.03, 13.0, 2, "go to position"),
             "land": (BLACK, 1.03, 13.5, 2, "land"),
+            #"camera gimbal": (BLACK, 1.03, 14.0, 2, "camera gimbal")
             #"drop authorization": (BLACK, 1.03, 14.0, 2, "drop UGV")
         }
 
@@ -192,6 +220,7 @@ class UserInterfaceLayer(g_l.Layer):
 
         # shortcuts
         line = pygame.draw.line
+        background = self.g_u_i.layers["background"]
 
         # for displaying altitude input
         text = "altitude: " + str(self.altitude_box) + "ft"
@@ -215,18 +244,16 @@ class UserInterfaceLayer(g_l.Layer):
         line(self.surface, BLACK, (D_S * 1.4, 0), (D_S * 1.4, D_S))
         line(self.surface, BLACK, (D_S * 1.7, 0), (D_S * 1.7, D_S))
 
+        # draw cursor for rotation
+        if self.layer_objects["button input go to"].on:
+            surf = pygame.Surface((D_S, D_S), pygame.SRCALPHA)
+            cur_pos = pygame.mouse.get_pos()
+            rad = background.map_scaling * O_R
+            pygame.draw.circle(surf, BLACK, cur_pos, rad, width=3)
+            self.surface.blit(surf, (0, 0))
+
     def mouse_button_down(self, event, cur_pos):
         """reacts to mouse button down event"""
-
-        # disallow map inputs if the mission started
-        if g_v.mc is None:
-            self.g_u_i.display_message("controller is busy",
-                                       "retry later", 0)
-            return
-        if g_v.mc.action != g_v.ControllerStatus.WAIT_REQUESTS:
-            self.g_u_i.display_message("controller is busy",
-                                       "retry later", 0)
-            return
 
         # shortcuts
         background = self.g_u_i.layers["background"]
@@ -320,71 +347,86 @@ class UserInterfaceLayer(g_l.Layer):
 
             # if the user is click on the map,
             # add the object they want to add
-            if not contact and pygame.mouse.get_pressed()[0]:
-
-                mp_layer.to_draw = True
-
-                # add waypoint
-                if self.layer_objects["button input waypoints"].on:
-                    mission_waypoints = g_v.mp.mission_waypoints
-                    a_b = self.altitude_box
-                    sel_way = self.selection["waypoints"]
-                    g_v.mp.add_waypoint(sel_way + 1, cur_on_map, a_b)
-                    self.selection["waypoints"] += 1
-                    if len(mission_waypoints) == 2:
-                        self.selection["waypoints"] = 1
-
-                # start inputing of obstacle
-                elif self.layer_objects["button input obstacles"].on:
-                    self.obstacle_inputing = True
-                    self.obstacle_input_pos = cur_pos
-
-                # add border vertex
-                elif self.layer_objects["button input border"].on:
-                    sel_border = self.selection["border"]
-                    g_v.mp.add_border_vertex(sel_border + 1, cur_on_map)
-                    self.selection["border"] += 1
-
-                # add search border vertex
-                elif self.layer_objects["button input search"].on:
-                    sel_search = self.selection["search"]
-                    g_v.mp.add_search_vertex(sel_search + 1, cur_on_map)
-                    self.selection["search"] += 1
-
-                # change location of airdrop position
-                elif self.layer_objects["button input airdrop"].on:
-                    g_v.mp.set_airdrop(cur_on_map)
-
-                # change location of airdrop goal
-                elif self.layer_objects["button input airdrop goal"].on:
-                    g_v.mp.set_airdrop_goal(cur_on_map)
-
-                # change location of lost comms position
-                elif self.layer_objects["button input lost comms"].on:
-                    g_v.mp.set_lostcomms(cur_on_map)
-
-                # change location of off axis object position
-                elif self.layer_objects["button input off axis"].on:
-                    g_v.mp.set_offaxis_obj(cur_on_map)
+            if pygame.mouse.get_pressed()[0]:
 
                 # change location of emergent object last known position
-                elif self.layer_objects["button input emergent"].on:
-                    g_v.mp.set_emergent_obj(cur_on_map)
+                if self.layer_objects["button input go to"].on:
+                    g_v.mc.queue.append(CS.GO_TO)
+                    g_v.mc.queue.append((cur_on_map, self.altitude_box))
+                    return
 
-                # change map area by inputing the top and bottom point
-                elif self.layer_objects["button input mapping"].on:
-                    if not self.mapping_inputing:
-                        self.mapping_inputing = True
-                        self.mapping_input_pos = cur_on_map
-                    else:
-                        self.mapping_inputing = False
-                        set_map = g_v.mp.set_mapping_area
-                        set_map(self.mapping_input_pos, cur_on_map)
+                if not contact:
 
-                # # change map area by inputing the top and bottom point
-                # elif self.input_type == "go to position button":
-                #     map_pos = self.g_u_i.map_projection(cur_pos)
-                #     g_v.rf.launch_go_to(map_pos, self.altitude_box)
+                    # check if controller is busy
+                    if self.g_u_i.is_controller_busy():
+                        return
+
+                    # check if plane on ground
+                    if g_v.th is None:
+                        return
+                    if not g_v.th.in_air.data_received():
+                        return
+                    if g_v.th.in_air.data["in air"]:
+                        self.g_u_i.display_message("not available mid-air",
+                                                   "", MT.CONTROLLER)
+                        return
+
+                    # add waypoint
+                    if self.layer_objects["button input waypoints"].on:
+                        mission_waypoints = g_v.mp.mission_waypoints
+                        a_b = self.altitude_box
+                        sel_way = self.selection["waypoints"]
+                        g_v.mp.add_waypoint(sel_way + 1, cur_on_map, a_b)
+                        self.selection["waypoints"] += 1
+                        if len(mission_waypoints) == 2:
+                            self.selection["waypoints"] = 1
+
+                    # start inputing of obstacle
+                    elif self.layer_objects["button input obstacles"].on:
+                        self.obstacle_inputing = True
+                        self.obstacle_input_pos = cur_pos
+
+                    # add border vertex
+                    elif self.layer_objects["button input border"].on:
+                        sel_border = self.selection["border"]
+                        g_v.mp.add_border_vertex(sel_border + 1, cur_on_map)
+                        self.selection["border"] += 1
+
+                    # add search border vertex
+                    elif self.layer_objects["button input search"].on:
+                        sel_search = self.selection["search"]
+                        g_v.mp.add_search_vertex(sel_search + 1, cur_on_map)
+                        self.selection["search"] += 1
+
+                    # change location of airdrop position
+                    elif self.layer_objects["button input airdrop"].on:
+                        g_v.mp.set_airdrop(cur_on_map)
+
+                    # change location of airdrop goal
+                    elif self.layer_objects["button input airdrop goal"].on:
+                        g_v.mp.set_airdrop_goal(cur_on_map)
+
+                    # change location of lost comms position
+                    elif self.layer_objects["button input lost comms"].on:
+                        g_v.mp.set_lostcomms(cur_on_map)
+
+                    # change location of off axis object position
+                    elif self.layer_objects["button input off axis"].on:
+                        g_v.mp.set_offaxis_obj(cur_on_map)
+
+                    # change location of emergent object last known position
+                    elif self.layer_objects["button input emergent"].on:
+                        g_v.mp.set_emergent_obj(cur_on_map)
+
+                    # change map area by inputing the top and bottom point
+                    elif self.layer_objects["button input mapping"].on:
+                        if not self.mapping_inputing:
+                            self.mapping_inputing = True
+                            self.mapping_input_pos = cur_on_map
+                        else:
+                            self.mapping_inputing = False
+                            set_map = g_v.mp.set_mapping_area
+                            set_map(self.mapping_input_pos, cur_on_map)
     
     def mouse_button_up(self, event, cur_pos):
         """react to mouse button up event"""
@@ -419,6 +461,7 @@ class UserInterfaceLayer(g_l.Layer):
         """react to tick event"""
 
         # keep updating window if inputing obstacle
-        if self.obstacle_inputing:
+        if (self.obstacle_inputing
+                or self.layer_objects["button input go to"].on):
             self.to_draw = True
         

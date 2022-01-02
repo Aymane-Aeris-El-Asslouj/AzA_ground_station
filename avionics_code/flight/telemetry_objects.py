@@ -42,6 +42,7 @@ class TelemetryObject:
         return self.data is not None
 
     def data_is_up_to_date(self):
-        """checks if telemetry data is up to date"""
+        """checks if telemetry data is up-to-date"""
 
-        return (time.time() - self.telemetry_time) < RF_TELEMETRY_ALLOWED_DELAY
+        time_diff = (time.time() - self.telemetry_time)
+        return time_diff < RF_TELEMETRY_ALLOWED_DELAY

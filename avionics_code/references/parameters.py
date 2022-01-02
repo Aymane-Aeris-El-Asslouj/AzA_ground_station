@@ -25,9 +25,10 @@ FONT_SIZE = 14
 FONT_TYPE = "Arial"
 ZOOM_RATIO = 4/3
 ZOOM_MAX = 5
+PLANE_SIZE = 100
 
 # RF comms parameters
-RF_TELEMETRY_RATE = 1  # (Hz) telemetry request rate for pixhawk, actual rate may vary
+RF_TELEMETRY_RATE = 15  # (Hz) telemetry request rate for pixhawk, actual rate may vary
 RF_TELEMETRY_RATE_SAMPLE = 20  # sample size for determining current telemetry rate
 RF_TELEMETRY_ALLOWED_DELAY = 1  # (s) delay for telemetry to no longer be valid
 
@@ -95,3 +96,7 @@ MAX_SPEED = 230  # (ft/s) max airspeed
 CRUISE_SPEED = 130  # (ft/s) cruise airspeed
 ORBIT_VELOCITY = 60  # (ft/s) orbit velocity for requested orbit
 ORBIT_RADIUS = 200  # (ft) orbit radius for requested orbit
+ORBIT_RADIUS_VALIDATION = 450
+
+# more parameters
+SLEEP_THREADS = False

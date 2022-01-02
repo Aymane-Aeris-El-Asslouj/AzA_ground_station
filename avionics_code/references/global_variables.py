@@ -34,15 +34,37 @@ class StandardStatus(Enum):
 
 @unique
 class ControllerStatus(Enum):
-    WAIT_CONNECTION = auto()
-    CHECK_AIR = auto()
+
+    AWAITING_GENERATION = auto()
+
+    AWAITING_CONNECTION = auto()
+    CHECKING_AIR = auto()
+
     DOWNLOAD_MISSION = auto()
-    WAIT_DOWNLOAD_MISSION = auto()
-    WAIT_POSITION_TELEMETRY = auto()
-    WAIT_COMPUTE_PATH = auto()
-    WAIT_REQUESTS = auto()
-    WAIT_GENERATION_FOR_DOWNLOAD = auto()
-    WAIT_GENERATION_FOR_COMPUTE = auto()
+    DOWNLOADING_MISSION = auto()
+
+    GENERATE_MISSION = auto()
+    GENERATING_MISSION = auto()
+
+    COMPUTE_PATH = auto()
+    COMPUTING_PATH = auto()
+
+    UPLOAD_MISSION = auto()
+    UPLOADING_MISSION = auto()
+
+    START_MISSION = auto()
+    STARTING_MISSION = auto()
+
+    PAUSE_MISSION = auto()
+    PAUSING_MISSION = auto()
+
+    GO_TO = auto()
+    GO_TOING = auto()
+
+    LAND = auto()
+
+    CAMERA_GIMBAL_COMMAND = auto()
+    CAMERA_GIMBAL_COMMANDING = auto()
 
 
 @unique
@@ -55,8 +77,20 @@ class MissionType(Enum):
     LANDING = auto()
 
 
-"""close request for the program"""
-close_request = False
+@unique
+class MessageType(Enum):
+    DEFAULT = auto()
+    COMMS = auto()
+    ERROR = auto()
+    CONTROLLER = auto()
+    MISSION_STATE = auto()
+
+
+@unique
+class Activity(Enum):
+    NA = auto()
+    ACTIVE = auto()
+    INACTIVE = auto()
 
 
 def get_status(obj, status_name):

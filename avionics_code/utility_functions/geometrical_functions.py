@@ -3,6 +3,7 @@ from avionics_code.references import parameters as para
 import math
 
 FLOAT_DIFFERENCE_FOR_EQUALITY = para.FLOAT_DIFFERENCE_FOR_EQUALITY
+F_D_E = FLOAT_DIFFERENCE_FOR_EQUALITY
 
 
 def non_zero_3d_vec(vec):
@@ -26,19 +27,20 @@ def non_zero_float(f):
 def float_eq(f1, f2):
     """check float equality"""
     
-    return abs(f2 - f1) < FLOAT_DIFFERENCE_FOR_EQUALITY
+    return abs(f2 - f1) < F_D_E
 
 
 def float_eq_2d(p1, p2):
     """check 2d_float equality"""
     
-    return math.hypot(p2[1] - p1[1], p2[0] - p1[0]) < FLOAT_DIFFERENCE_FOR_EQUALITY
+    return math.hypot(p2[1] - p1[1], p2[0] - p1[0]) < F_D_E
 
 
 def float_eq_3d(p1, p2):
     """check 3d_float equality"""
 
-    return math.hypot(p2[2] - p1[2], p2[1] - p1[1], p2[0] - p1[0]) < FLOAT_DIFFERENCE_FOR_EQUALITY
+    dis = math.hypot(p2[2] - p1[2], p2[1] - p1[1], p2[0] - p1[0])
+    return dis < F_D_E
 
 
 def distance_2d(p1, p2):
@@ -50,7 +52,8 @@ def distance_2d(p1, p2):
 def distance_3d(p1, p2):
     """distance between two 3d points"""
 
-    return math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2 + (p2[2] - p1[2])**2)
+    return math.sqrt((p2[0] - p1[0])**2 + (p2[1] - p1[1])**2
+                     + (p2[2] - p1[2])**2)
 
 
 def center_2d(p1, p2):
@@ -71,13 +74,15 @@ def unit_vector(vector):
     if float_eq_2d(vector, (0, 0)):
         return None
     else:
-        return vector[0] / distance_2d(vector, (0, 0)), vector[1] / distance_2d(vector, (0, 0))
+        return (vector[0] / distance_2d(vector, (0, 0)),
+                vector[1] / distance_2d(vector, (0, 0)))
 
 
 def linear_vectors(fac1, vec_1, fac2, vec_2):
     """linear combination of vectors"""
 
-    return fac1 * vec_1[0] + fac2 * vec_2[0], fac1 * vec_1[1] + fac2 * vec_2[1]
+    return (fac1 * vec_1[0] + fac2 * vec_2[0],
+            fac1 * vec_1[1] + fac2 * vec_2[1])
 
 
 def add_vectors(vector_1, vector_2):
@@ -121,26 +126,28 @@ def rotate_vector(vector, angle):
 def rotate_vector_with_center(vector, center, angle):
     """rotates a vector with respect to some center"""
     
-    return add_vectors(center, rotate_vector(sub_vectors(vector, center), angle))
+    rel = sub_vectors(vector, center)
+    return add_vectors(center, rotate_vector(rel, angle))
 
 
 def homothety_unit(vector, center, factor):
     """pushes some vector away so it is distance factor away"""
 
     if distinct_points_2(vector, center):
-        return add_vectors(center, scale_vector(unit_vector(sub_vectors(vector, center)), factor))
+        u_rel = unit_vector(sub_vectors(vector, center))
+        return add_vectors(center, scale_vector(u_rel, factor))
     else:
         return None
 
 
-def vector_average(vector_list):
+def vector_average(vec_list):
     """gives average of a list of vectors"""
     
-    if len(vector_list) == 0:
+    if len(vec_list) == 0:
         return None
     else:
-        vec_x = sum(list(vector_i[0] for vector_i in vector_list)) / len(vector_list)
-        vec_y = sum(list(vector_i[1] for vector_i in vector_list)) / len(vector_list)
+        vec_x = sum(list(vec_i[0] for vec_i in vec_list)) / len(vec_list)
+        vec_y = sum(list(vec_i[1] for vec_i in vec_list)) / len(vec_list)
         return vec_x, vec_y
 
 
@@ -160,7 +167,9 @@ def find_angle(vector_1, vector_2):
     if norm(vector_1) == 0 or norm(vector_2) == 0:
         return None
     else:
-        angle = math.atan2(vector_2[1], vector_2[0]) - math.atan2(vector_1[1], vector_1[0])
+        a1 = math.atan2(vector_2[1], vector_2[0])
+        a2 = math.atan2(vector_1[1], vector_1[0])
+        angle = a1 - a2
         return clamp_angle(angle)
 
 
@@ -170,7 +179,9 @@ def find_geometrical_angle(vector_1, vector_2):
     if norm(vector_1) == 0 or norm(vector_2) == 0:
         return None
     else:
-        angle = abs(math.atan2(vector_2[1], vector_2[0]) - math.atan2(vector_1[1], vector_1[0]))
+        a1 = math.atan2(vector_2[1], vector_2[0])
+        a2 = math.atan2(vector_1[1], vector_1[0])
+        angle = abs(a1 - a2)
         if angle < math.pi:
             return angle
         else:
@@ -182,7 +193,8 @@ def line_from_points(point_1, point_2):
     
     x_1, y_1 = point_1
     x_2, y_2 = point_2
-    return -(y_2 - y_1), (x_2 - x_1), x_2 * (y_2 - y_1) - y_2 * (x_2 - x_1)
+    return (-(y_2 - y_1), (x_2 - x_1),
+            x_2 * (y_2 - y_1) - y_2 * (x_2 - x_1))
 
 
 def unit_normal_vectors_to_line(point_1, point_2):
@@ -233,9 +245,11 @@ def distinct_points_4(point_1, point_2, point_3, point_4):
 
 
 def point_to_line_distance(point_3, point_1, point_2):
-    """find distance between point 3 and line of point_1 and point_2"""
+    """find distance between point 3 and line of
+    point_1 and point_2"""
     
-    # if the two points do not form a line, get distance from point 3 to the two points
+    # if the two points do not form a line,
+    # get distance from point 3 to the two points
     if float_eq_2d(point_1, point_2):
         return distance_2d(point_3, point_2)
     else:
@@ -246,22 +260,26 @@ def point_to_line_distance(point_3, point_1, point_2):
         return abs(a * x_3 + b * y_3 + c) / (math.hypot(a, b))
 
 
-def line_to_circle_intersection(point_1, point_2, circle_cen, circle_rad):
+def line_to_circle_intersection(point_1, point_2, circle_cen,
+                                circle_rad):
     """checks if a line intersects with a circle"""
     
-    # if the two points do not form a line, verify that they are not inside the obstacle
+    # if the two points do not form a line,
+    # verify that they are not inside the obstacle
     if float_eq_2d(point_1, point_2):
         return distance_2d(point_1, circle_cen) < circle_rad
     else:
         # get distance between line and center of circle
-        line_to_center_distance = point_to_line_distance(circle_cen, point_1, point_2)
-        return line_to_center_distance < circle_rad
+        dis = point_to_line_distance(circle_cen, point_1, point_2)
+        return dis < circle_rad
 
 
-def circle_to_circle_intersection(circle_cen_1, circle_rad_1, circle_cen_2, circle_rad_2):
+def circle_to_circle_intersection(circle_cen_1, circle_rad_1,
+                                  circle_cen_2, circle_rad_2):
     """check if two circles intersect"""
     
-    return distance_2d(circle_cen_1, circle_cen_2) < circle_rad_1 + circle_rad_2
+    dis = distance_2d(circle_cen_1, circle_cen_2)
+    return dis < circle_rad_1 + circle_rad_2
 
 
 def seg_to_disk_intersection(point_1, point_2, circle_cen, circle_rad):
@@ -271,9 +289,11 @@ def seg_to_disk_intersection(point_1, point_2, circle_cen, circle_rad):
         return distance_2d(point_1, circle_cen) < circle_rad
     else:
         # check if the line intersects the disk
-        if not line_to_circle_intersection(point_1, point_2, circle_cen, circle_rad):
+        if not line_to_circle_intersection(point_1, point_2,
+                                           circle_cen, circle_rad):
             return False
-        # check if circle center is inside pill area around seg of radius circle radius
+        # check if circle center is inside pill
+        # area around seg of radius circle radius
         # move reference point to point_1
         point_2_new = sub_vectors(point_2, point_1)
         circle_cen_new = sub_vectors(circle_cen, point_1)
@@ -306,7 +326,8 @@ def point_inside_circle(point, circle_cen, circle_rad):
 def point_on_seg(point_3, point_1, point_2):
     """check point 3 is on seg [point 1, point 2]"""
     
-    is_on_line = float_eq(point_to_line_distance(point_3, point_1, point_2), 0)
+    dis = point_to_line_distance(point_3, point_1, point_2)
+    is_on_line = float_eq(dis, 0)
     middle = center_2d(point_1, point_2)
     half_seg = distance_2d(point_1, point_2) / 2
     is_inside_range = point_inside_circle(point_3, middle, half_seg)
@@ -317,21 +338,27 @@ def line_intersection(point_1, point_2, point_3, point_4):
     """find the intersection of two lines"""
     
     # if None of the points form lines, check if they are the same
-    if float_eq_2d(point_1, point_2) and float_eq_2d(point_3, point_4) and float_eq_2d(point_1, point_3):
+    if (float_eq_2d(point_1, point_2) and float_eq_2d(point_3, point_4)
+            and float_eq_2d(point_1, point_3)):
         return point_1
-    # if point 1 and point 2 do not form a line, check if they are inside the other seg
-    elif float_eq_2d(point_1, point_2) and (not float_eq_2d(point_3, point_4)):
+    # if point 1 and point 2 do not form a line,
+    # check if they are inside the other seg
+    elif (float_eq_2d(point_1, point_2) and
+          (not float_eq_2d(point_3, point_4))):
         if point_on_seg(point_1, point_3, point_4):
             return point_1
         else:
             return None
-    # if point 3 and point 4 do not form a line, check if they are inside the other seg
-    elif float_eq_2d(point_3, point_4) and (not float_eq_2d(point_1, point_2)):
+    # if point 3 and point 4 do not form a line,
+    # check if they are inside the other seg
+    elif (float_eq_2d(point_3, point_4)
+          and (not float_eq_2d(point_1, point_2))):
         if point_on_seg(point_3, point_1, point_2):
             return point_3
         else:
             return None
-    # if they do form lines, check if their intersection is on one of the two segments
+    # if they do form lines, check if their intersection
+    # is on one of the two segments
     else:
         a1, b1, c1 = line_from_points(point_1, point_2)
         a2, b2, c2 = line_from_points(point_3, point_4)
@@ -353,17 +380,24 @@ def seg_to_seg_intersection(point_1, point_2, point_3, point_4):
     """check if two segments intersect:"""
     
     # if None of the points form lines, check if they are the same
-    if float_eq_2d(point_1, point_2) and float_eq_2d(point_3, point_4):
+    if (float_eq_2d(point_1, point_2)
+            and float_eq_2d(point_3, point_4)):
         return float_eq_2d(point_1, point_3)
-    # if point 1 and point 2 do not form a line, check if they are inside the other seg
-    elif float_eq_2d(point_1, point_2) and (not float_eq_2d(point_3, point_4)):
+    # if point 1 and point 2 do not form a line,
+    # check if they are inside the other seg
+    elif (float_eq_2d(point_1, point_2)
+          and (not float_eq_2d(point_3, point_4))):
         return point_on_seg(point_1, point_3, point_4)
-    # if point 3 and point 4 do not form a line, check if they are inside the other seg
-    elif float_eq_2d(point_3, point_4) and (not float_eq_2d(point_1, point_2)):
+    # if point 3 and point 4 do not form a line,
+    # check if they are inside the other seg
+    elif (float_eq_2d(point_3, point_4)
+          and (not float_eq_2d(point_1, point_2))):
         return point_on_seg(point_3, point_1, point_2)
-    # if they do form lines, check if their intersection is on one of the two segments
+    # if they do form lines, check if their
+    # intersection is on one of the two segments
     else:
-        intersection = line_intersection(point_1, point_2, point_3, point_4)
+        intersection = line_intersection(point_1, point_2,
+                                         point_3, point_4)
         if intersection is None:
             return False
         elif float_eq_2d(intersection, (float("+inf"), float("+inf"))):
@@ -377,18 +411,26 @@ def seg_to_seg_intersection(point_1, point_2, point_3, point_4):
 def seg_to_line_intersection(point_1, point_2, point_3, point_4):
     """check if a seg intersects with a intersect:"""
     
-    # if None of the points form lines, check if they are the same
-    if float_eq_2d(point_1, point_2) and float_eq_2d(point_3, point_4):
+    # if None of the points form lines,
+    # check if they are the same
+    if (float_eq_2d(point_1, point_2)
+            and float_eq_2d(point_3, point_4)):
         return float_eq_2d(point_1, point_3)
-    # if point 1 and point 2 do not form a line, check if they are inside the other seg
-    elif float_eq_2d(point_1, point_2) and (not float_eq_2d(point_3, point_4)):
+    # if point 1 and point 2 do not form a line,
+    # check if they are inside the other seg
+    elif (float_eq_2d(point_1, point_2)
+          and (not float_eq_2d(point_3, point_4))):
         return point_on_seg(point_1, point_3, point_4)
-    # if point 3 and point 4 do not form a line, check if they are inside the other seg
-    elif float_eq_2d(point_3, point_4) and (not float_eq_2d(point_1, point_2)):
+    # if point 3 and point 4 do not form a line,
+    # check if they are inside the other seg
+    elif (float_eq_2d(point_3, point_4)
+          and (not float_eq_2d(point_1, point_2))):
         return point_on_seg(point_3, point_1, point_2)
-    # if they do form lines, check if their intersection is on one of the two segments
+    # if they do form lines, check if their
+    # intersection is on one of the two segments
     else:
-        intersection = line_intersection(point_1, point_2, point_3, point_4)
+        intersection = line_intersection(point_1, point_2,
+                                         point_3, point_4)
         if intersection is None:
             return False
         elif float_eq_2d(intersection, (float("+inf"), float("+inf"))):
@@ -398,12 +440,14 @@ def seg_to_line_intersection(point_1, point_2, point_3, point_4):
             return p_1
 
 
-def seg_to_seg_with_safety(point_1, point_2, point_3, point_4, safety_distance):
+def seg_to_seg_with_safety(point_1, point_2, point_3,
+                           point_4, safety_distance):
     """check if seg 1 intersects seg 2 in an
     area close to it by some safety distance"""
     
     s_d = safety_distance
-    # check if points are not intersecting two larger zones around the seg 2
+    # check if points are not intersecting
+    # two larger zones around the seg 2
     middle = center_2d(point_3, point_4)
     quarter_seg = distance_2d(point_3, point_4) / 4
     quarter_1 = center_2d(middle, point_3)
@@ -444,15 +488,17 @@ def seg_to_seg_with_safety(point_1, point_2, point_3, point_4, safety_distance):
         elif seg_to_disk_intersection(point_3, point_4, point_2, s_d):
             return True
         else:
-            # seg (1-2) does not intersect with safety segments to the side of seg (3-4)
-            offset_normal_1, offset_normal_2 = unit_normal_vectors_to_line(point_3, point_4)
-            point_3_off_1 = add_vectors(point_3, scale_vector(offset_normal_1, s_d))
-            point_3_off_2 = add_vectors(point_3, scale_vector(offset_normal_2, s_d))
-            point_4_off_1 = add_vectors(point_4, scale_vector(offset_normal_1, s_d))
-            point_4_off_2 = add_vectors(point_4, scale_vector(offset_normal_2, s_d))
-            if seg_to_seg_intersection(point_1, point_2, point_3_off_1, point_4_off_1):
+            # seg (1-2) does not intersect with safety
+            # segments to the side of seg (3-4)
+            off_1, off_2 = unit_normal_vectors_to_line(point_3, point_4)
+            point_3_off_1 = add_vectors(point_3, scale_vector(off_1, s_d))
+            point_3_off_2 = add_vectors(point_3, scale_vector(off_2, s_d))
+            point_4_off_1 = add_vectors(point_4, scale_vector(off_1, s_d))
+            point_4_off_2 = add_vectors(point_4, scale_vector(off_2, s_d))
+            inter = seg_to_seg_intersection
+            if inter(point_1, point_2, point_3_off_1, point_4_off_1):
                 return True
-            elif seg_to_seg_intersection(point_1, point_2, point_3_off_2, point_4_off_2):
+            elif inter(point_1, point_2, point_3_off_2, point_4_off_2):
                 return True
             else:
                 return False
@@ -490,7 +536,9 @@ def is_crossing_over_edge(point_1, point_2, crossing_point, edge_point):
             return False
         # check if the path is crossing over the edge
         else:
-            return new_point_2[1] / new_point_2[0] < new_point_1[1] / new_point_1[0]
+            ratio_1 = new_point_1[1] / new_point_1[0]
+            ratio_2 = new_point_2[1] / new_point_2[0]
+            return ratio_2 < ratio_1
     else:
         return False
 
@@ -503,19 +551,20 @@ def tangent_points(point, circle_cen, circle_rad):
     # get axis vector from waypoint to center of turn center
     axis_vector = sub_vectors(circle_cen, point)
     axis_unit = unit_vector(axis_vector)
-    axis_distance = norm(axis_vector)
-    # get normal vectors to the line connecting the waypoint and the center of the obstacle
+    axis_dis = norm(axis_vector)
+    # get normal vectors to the line connecting
+    # the waypoint and the center of the obstacle
     n_vector_1, n_vector_2 = unit_normal_vectors_to_line(point, circle_cen)
     # distance on axis from waypoint to obstacle center for the nodes
-    node_axis_distance = (axis_distance ** 2 - circle_rad ** 2) / axis_distance
+    node_axis_dis = (axis_dis ** 2 - circle_rad ** 2) / axis_dis
 
     # distance on normal axis for offset of the new nodes
-    a = (circle_rad / axis_distance)
-    b = (math.sqrt(axis_distance ** 2 - circle_rad ** 2))
+    a = (circle_rad / axis_dis)
+    b = (math.sqrt(axis_dis ** 2 - circle_rad ** 2))
     node_normal_distance = a * b
 
     # scale vectors
-    axis_scaled = scale_vector(axis_unit, node_axis_distance)
+    axis_scaled = scale_vector(axis_unit, node_axis_dis)
     s_vector_1 = scale_vector(n_vector_1, node_normal_distance)
     s_vector_2 = scale_vector(n_vector_2, node_normal_distance)
 
@@ -523,7 +572,8 @@ def tangent_points(point, circle_cen, circle_rad):
     way_to_node_1 = add_vectors(axis_scaled, s_vector_1)
     way_to_node_2 = add_vectors(axis_scaled, s_vector_2)
     # add vectors to waypoint location type
-    return add_vectors(point, way_to_node_1), add_vectors(point, way_to_node_2)
+    return (add_vectors(point, way_to_node_1),
+            add_vectors(point, way_to_node_2))
 
 
 def point_inside_polygon(point, polygon):
@@ -544,7 +594,8 @@ def point_inside_polygon(point, polygon):
         
         # intersection between a horizontal bidirectional
         # ray from the source point with the edge
-        inter = line_intersection(cur_vertex, next_vertex, point, side_point)
+        inter = line_intersection(cur_vertex, next_vertex,
+                                  point, side_point)
 
         # check that an intersection happened
         if inter is not None:
@@ -567,11 +618,12 @@ def point_inside_polygon(point, polygon):
 def point_to_seg_distance(point, vertex_1, vertex_2):
     """returns distance from a line to a segment"""
 
-    return distance_2d(point, point_to_seg_projection(point, vertex_1, vertex_2))
+    proj = point_to_seg_projection(point, vertex_1, vertex_2)
+    return distance_2d(point, proj)
 
 
 def point_to_seg_projection(point, vertex_1, vertex_2):
-    """finds closest point on segment to main point"""
+    """finds the closest point on segment to main point"""
 
     if float_eq_2d(vertex_1, vertex_2):
         return vertex_1

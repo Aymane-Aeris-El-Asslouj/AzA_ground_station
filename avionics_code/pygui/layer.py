@@ -37,6 +37,7 @@ class Layer:
         # store reference to GUI window
         self.g_u_i = g_u_i
         self.font = g_u_i.font
+        self.font_u = g_u_i.font_u
 
         # stores whether the surface needs to be redrawn
         self.to_draw = False

@@ -4,7 +4,7 @@ from avionics_code.utility_functions import geometrical_functions as g_f
 from avionics_code.pygui import layer as g_l
 from avionics_code.pygui import colors as col
 
-from .. import drawing_functions as d_f
+from avionics_code.avionics_gui import drawing_functions as d_f
 
 import pygame
 import math
@@ -47,7 +47,7 @@ class MissionStateLayer(g_l.Layer):
             for index, way in enumerate(waypoint_list):
 
                 # draw active ways in cyan and those done in green
-                if way.is_mission == 1:
+                if way.is_mission == g_v.Activity.ACTIVE:
                     # if this is the first active way, make it bigger
                     if not prev_way_active:
                         size = W_S * 0.75 * math.sqrt(zoom)
@@ -61,9 +61,9 @@ class MissionStateLayer(g_l.Layer):
                     prev_way_active = False
                     color = GREEN
 
-                if inactive_display or way.is_mission == 1:
+                if inactive_display or way.is_mission == g_v.Activity.ACTIVE:
                     # find the mission index of the way
-                    mission_index = way.mission_index
+                    mission_type = way.mission_type
 
                     MT = g_v.MissionType
                     trans = {
@@ -75,7 +75,7 @@ class MissionStateLayer(g_l.Layer):
                     }
 
                     # draw the way with its target and arrow from previous way
-                    if trans[mission_index]:
+                    if trans[mission_type]:
 
                         # draw the way
                         center = background.dashboard_projection(way)

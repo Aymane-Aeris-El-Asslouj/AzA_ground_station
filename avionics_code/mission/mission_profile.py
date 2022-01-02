@@ -3,6 +3,7 @@ from avionics_code.references import global_variables as g_v
 from avionics_code.utility_functions import geography_functions as gg_f
 from avionics_code.utility_functions import geometrical_functions as g_f
 
+SS = g_v.StandardStatus
 
 def mp_update_decorator(func):
     """makes all updates set the mission state
@@ -10,11 +11,16 @@ def mp_update_decorator(func):
 
     def new_func(*args):
         func(*args)
-        g_v.ms.generation_status = g_v.StandardStatus.EXPIRED
-        g_v.mc.path_computation_status = g_v.StandardStatus.EXPIRED
-        g_v.rf.upload_status = g_v.StandardStatus.EXPIRED
+        gui_sys = g_v.gui.layers["system status"]
+        if g_v.ms.generation_status == SS.SUCCESS:
+            g_v.ms.generation_status = SS.EXPIRED
+            gui_sys.cover_percentage = 0
+        if g_v.mc.path_computation_status == SS.SUCCESS:
+            g_v.mc.path_computation_status = SS.EXPIRED
+            gui_sys.path_search_percentage = 0
+        if g_v.rf.upload_status == SS.SUCCESS:
+            g_v.rf.upload_status = SS.EXPIRED
         g_v.gui.to_draw("mission profile")
-        g_v.gui.to_draw("system status")
 
     return new_func
 
@@ -97,7 +103,8 @@ class MissionProfile:
 
     @mp_update_decorator
     def add_waypoint(self, i, waypoint_tuple, altitude):
-        way = p_o.Waypoint(0, waypoint_tuple, altitude, is_mission=1)
+        way = p_o.Waypoint(0, waypoint_tuple, altitude,
+                           is_mission=g_v.Activity.ACTIVE)
         self.mission_waypoints.insert(i, way)
 
     @mp_update_decorator
@@ -166,7 +173,8 @@ class MissionProfile:
         way_tuples = list(zip(mission_xy_tuples, altitude_tuples))
         WAY_TYPE = g_v.MissionType.WAYPOINTS
         self.mission_waypoints = list(
-            p_o.Waypoint(WAY_TYPE, t[0], t[1], is_mission=1) for t in way_tuples)
+            p_o.Waypoint(WAY_TYPE, t[0], t[1],
+                         is_mission=g_v.Activity.ACTIVE) for t in way_tuples)
 
         # Search grid
         pos_iter = g_t_c_l(data['searchGridPoints'])
