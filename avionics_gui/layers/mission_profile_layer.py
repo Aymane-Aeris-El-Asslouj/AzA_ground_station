@@ -116,7 +116,7 @@ class MissionProfileLayer(g_l.Layer):
             if settings["button input border"]["activated"]:
                 if len(border.vertices) > 1:
                     points = list(dash_proj(v) for v in border.vertices)
-                    aalines(self.surface, DARKISH_RED, closed=True, points=points)
+                    pygame.draw.polygon(self.surface, DARKISH_RED, points, width=5)
                 points = border.vertices
                 d_r_p = d_f.draw_rescaled_points
                 sel_vertices = user_interface.selection["border"]

@@ -2,6 +2,7 @@ from references import global_variables as g_v
 from references import parameters as para
 from pygui import layer as g_l
 from pygui import colors as col
+from utility_functions import geometrical_functions as g_f
 
 from avionics_gui import drawing_functions as d_f
 
@@ -27,6 +28,9 @@ class TelemetryLayer(g_l.Layer):
 
         # list of plane position
         self.position_history = list()
+
+        # testing
+        self.minims = [1000000]*500
 
     def redraw(self):
         """Displays information of the flight profile
@@ -104,6 +108,7 @@ class TelemetryLayer(g_l.Layer):
             plane_obj = th.position.data["flight object"]
             d_xy_text = str(round(active_way.distance_2d_to(plane_obj)))
             d_z_text = str(round(active_way.z - plane_obj.z))
+
         else:
             d_xy_text = "NaN"
             d_z_text = "NaN"
@@ -137,6 +142,13 @@ class TelemetryLayer(g_l.Layer):
 
             # add position to position history
             self.position_history.append(plane_obj)
+
+            # for testing
+            if len(self.position_history) > 1:
+                for index, way in enumerate(g_v.ms.waypoint_list):
+                    dis = g_f.point_to_seg_distance(way.pos, plane_obj.pos, self.position_history[-2].pos)
+                    self.minims[index] = min(self.minims[index], dis)
+                print(self.minims)
 
         self.surface.blit(surf, (0, 0))
 

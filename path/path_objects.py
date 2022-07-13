@@ -503,6 +503,8 @@ class Waypoint(MapObject):
         """adds turning waypoints to make the plane pass
         through the waypoint if needed"""
 
+        return True
+
         need_curving = self.mission_type == g_v.MissionType.WAYPOINTS
         # if mission point, make waypoint to go through it
         if self.is_mission != g_v.Activity.NA and need_curving:

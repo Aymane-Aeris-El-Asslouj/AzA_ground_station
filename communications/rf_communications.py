@@ -62,10 +62,15 @@ class RFComs:
         await asyncio.get_event_loop().shutdown_asyncgens()
 
         # get base connection
-        await self.pixhawk.connect(system_address="udp://:14540")
+        #await self.pixhawk.connect(system_address="serial:///dev/serial/by-id/usb-FTDI_FT232R_USB_UART_AL064JN6-if00-port0:57600")
+        await self.pixhawk.connect()
+
         async for state in self.pixhawk.core.connection_state():
             if state.is_connected:
                 break
+
+
+        await self.pixhawk.action.arm()
 
         # upload parameters
         await self.set_parameters()

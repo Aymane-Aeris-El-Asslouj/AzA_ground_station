@@ -54,7 +54,7 @@ LANDING_COORDINATES = {
 }
 
 # CV/Hardware parameters
-CV_IMAGE_GROUND_SIZE = 50  # (ft) side of the ground square area covered by CV's camera
+CV_IMAGE_GROUND_SIZE = 130  # (ft) side of the ground square area covered by CV's camera
 OFF_AXIS_IMAGING_RANGE = 350  # (ft) ground range of off-axis imaging
 AIR_DROP_ALTITUDE = 200.0  # (ft) altitude for airdrop
 IMAGING_ALTITUDE = 200.0  # (ft) altitude for imaging
